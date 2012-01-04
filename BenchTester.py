@@ -5,13 +5,6 @@
 # http://mozilla.org/MPL/2.0/.
 
 import sys
-
-# Give meaningful error rather than import failures if
-# run under py3.x (mozmill is 2.x only at the moment)
-if __name__ == "__main__" and sys.hexversion >= 0x03000000:
-  sys.stderr.write("Python 3.x is unsupported :(\n")
-  sys.exit(1)
-
 import os
 import argparse
 import sqlite3
