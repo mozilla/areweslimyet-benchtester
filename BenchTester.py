@@ -144,7 +144,7 @@ class BenchTester():
       return self.error("run_test() called before setup")
     
     # Make sure checkout and build have been done
-    if not self.checkout() and self.build():
+    if not (self.checkout() and self.build()):
       return False
     
     if self.modules.has_key(testtype):
