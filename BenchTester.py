@@ -124,7 +124,9 @@ class BenchTester():
       return self.error("Build triggered an exception: %s" % e)
     
     # Wait for EOF, logging if desired
-    while data = proc.stdout.read(1024):
+    while True:
+      data = proc.stdout.read(1024)
+      if not data: break
       if self.autobuild_logfile:
         self.autobuild_logfile.write(data)
         
