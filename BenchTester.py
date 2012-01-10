@@ -283,7 +283,7 @@ class BenchTester():
                                                      action='store_true')
     self.add_argument('--autobuild-objdir',          help='Path to object directory (absolute or relative to repo) that \
                                                            given mozconfig will output')
-    self.add_argument('--autobuild-log',             help='Dump build output to given file' 
+    self.add_argument('--autobuild-log',             help='Dump build output to given file')
     self.add_argument('--buildname',                 help='The name of this firefox build. If omitted, attempts to use the \
                                                            commit id from the mercurial respository the binary resides \
                                                            in, or the changeset id in autobuild mode')
