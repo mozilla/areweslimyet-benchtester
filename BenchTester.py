@@ -115,10 +115,19 @@ class BenchTester():
     
     self.info("Beginning build")
     try:
-      proc = subprocess.Popen(['make', '-f', 'client.mk'], env=newenv, cwd=self.repopath)
+      proc = subprocess.Popen(['make', '-f', 'client.mk'],
+                              env=newenv,
+                              cwd=self.repopath,
+                              stderr=subprocess.STDOUT,
+                              stdout=subprocess.PIPE)
     except Exception, e:
       return self.error("Build triggered an exception: %s" % e)
     
+    # Wait for EOF, logging if desired
+    while data = proc.stdout.read(1024):
+      if self.autobuild_logfile:
+        self.autobuild_logfile.write(data)
+        
     ret = proc.wait()
     if ret == 0:
       self.info("Build successful")
@@ -133,8 +142,8 @@ class BenchTester():
       return self.error("run_test() called before setup")
     
     # Make sure checkout and build have been done
-    self.checkout()
-    self.build()
+    if not self.checkout() and self.build():
+      return False
     
     if self.modules.has_key(testtype):
       self.info("Passing test '%s' to module '%s'" % (testname, testtype))
@@ -195,8 +204,12 @@ class BenchTester():
     if self.autobuild_pull:
       self.info("Beginning mercurial pull")
       try:
+        self.hg_ui.pushbuffer()
         self.hg_ui.readconfig(os.path.join(self.repopath, ".hg", "hgrc"))
         mercurial.commands.pull(self.hg_ui, self.repo, update=True, check=True)
+        result = self.hg_ui.popbuffer()
+        if self.autobuild_logfile:
+          self.autobuild_logfile.write(result)
       except Exception, e:
         return self.error("Failed to pull mercurial repo, Exception '%s': %s" % (type(e), e))
     
@@ -227,7 +240,11 @@ class BenchTester():
 
     self.info("Beginning mercurial checkout")
     try:
+      self.hg_ui.pushbuffer()
       mercurial.commands.update(self.hg_ui, self.repo, self.commit, check=True)
+      result = self.hg_ui.popbuffer()
+      if self.autobuild_logfile:
+        self.autobuild_logfile.write(result)
     except Exception, e:
       return self.error("Failed to checkout revision '%s', Error: %s" % (self.commit, e))
     self.info("Succesfully checked out revision '%s'" % self.commit)
@@ -243,6 +260,7 @@ class BenchTester():
     self.modules = {}
     self.logfile = None
     self.buildtime = None
+    self.autobuild_logfile = None
     self.buildname = None
     self.sqlite = False
     self.checked_out = False
@@ -263,6 +281,7 @@ class BenchTester():
                                                      action='store_true')
     self.add_argument('--autobuild-objdir',          help='Path to object directory (absolute or relative to repo) that \
                                                            given mozconfig will output')
+    self.add_argument('--autobuild-log',             help='Dump build output to given file' 
     self.add_argument('--buildname',                 help='The name of this firefox build. If omitted, attempts to use the \
                                                            commit id from the mercurial respository the binary resides \
                                                            in, or the changeset id in autobuild mode')
@@ -272,7 +291,7 @@ class BenchTester():
                                                            the changeset being tested in autobuild mode')
     self.add_argument('--test-module', '-m',         help='Load the specified test module (from libs). You must load at least one module to have tests',
                                                      action='append')
-    self.add_argument('-l', '--logfile',              help='Log to given file')
+    self.add_argument('-l', '--logfile',             help='Log to given file')
     self.add_argument('-s', '--sqlitedb',            help='Merge datapoint into specified sqlite database')
     
     self.info("BenchTester instantiated")
@@ -365,7 +384,6 @@ class BenchTester():
           time, msg, timestamp = self.logcache.pop()
           self.log(time, msg, timestamp, True)
         self.logcache = None
-    
     self.info("Opened logfile")
     
     # Setup autobuild
@@ -387,11 +405,17 @@ class BenchTester():
       
       if not os.path.exists(self.mozconfig):
         return self.error("Given mozconfig does not exist (%s)" % self.mozconfig)
-        
+      
+      if self.args['autobuild_log']:
+        try:
+          self.autobuild_logfile = open(self.args['autobuild_log'], 'w')
+        except Exception, e:
+          self.error("Failed to open log file '%s' for writing" % self.args['autobuild_log'])
+        self.info("Opened build log file")
       self.autobuild_pull = self.args['autobuild_pull']
       self.autobuild = True
     else:
-      if self.args['autobuild_commit'] or self.args['autobuild_mozconfig'] or self.args['autobuild_objdir']:
+      if self.args['autobuild_log'] or self.args['autobuild_commit'] or self.args['autobuild_mozconfig'] or self.args['autobuild_objdir']:
         return self.error("Autobuild options do not make sense without --autobuild-repo")
       self.autobuild = False
     
