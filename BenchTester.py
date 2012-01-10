@@ -9,7 +9,7 @@ import os
 import argparse
 import sqlite3
 import subprocess
-import mercurial, mercurial.ui, mercurial.hg
+import mercurial, mercurial.ui, mercurial.hg, mercurial.commands
 import time
 
 gTableSchemas = [
