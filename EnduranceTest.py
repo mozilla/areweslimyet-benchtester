@@ -11,9 +11,6 @@ import shutil
 import tempfile
 import re
 
-# Data points returned in endurance checkpoints
-gEnduranceDataTypes = ['resident', 'explicit']
-
 class EnduranceTest(BenchTester.BenchTest):
   def __init__(self, parent):
     BenchTester.BenchTest.__init__(self, parent)
@@ -102,8 +99,8 @@ class EnduranceTest(BenchTester.BenchTest):
       for checkpoint in iteration['checkpoints']:
         # Get rid of the [i:0, e:5] crap endurance adds
         label = re.sub(" \[i:\d+ e:\d+\]$", "", checkpoint['label'])
-        for etype in gEnduranceDataTypes:
-          results[".".join(["Iteration %u" % iternum, label, etype])] = checkpoint[etype]
+        for memtype,memval in checkpoint['memory'].items():
+          results[".".join(["Iteration %u" % iternum, label, "mem", memtype])] = memval
     
     if not self.tester.add_test_results(testname, results):
       return self.error("Failed to save test results")
