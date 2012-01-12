@@ -18,22 +18,9 @@ class EnduranceTest(BenchTester.BenchTest):
   def __init__(self, parent):
     BenchTester.BenchTest.__init__(self, parent)
     self.name = "EnduranceTest"
-
-    self.tester.add_argument('--mozmill-tests',             help='Path to look for the mozmill tests in. Defaults to \
-                                                                  ./mozmill-tests',
-                                                            default='./mozmill-tests')
   
   def setup(self):
     self.info("Setting up Endurance module")
-    testpath = self.tester.args['mozmill_tests']
-    try:
-      testpath = os.path.abspath(testpath)
-      if not os.path.exists(testpath):
-        raise Exception("File not found: %s" % testpath)
-    except Exception, e:
-      return self.error("--mozmill-tests path '%s' could not be found: %s" % (self.tester.args['mozmill_tests'], e))
-    self.mozmill_tests = testpath
-    
     self.ready = True
     return True
   
@@ -74,9 +61,9 @@ class EnduranceTest(BenchTester.BenchTest):
     runner = mozrunner.FirefoxRunner(binary=self.tester.binary, profile=profile)
     
     # Add test
-    testpath = os.path.join(self.mozmill_tests, "tests", "endurance", *testvars['test'])
+    testpath = os.path.join(*testvars['test'])
     if not os.path.exists(testpath):
-      return self.error("Test '%s' specifies a test that doesn't exist in given --mozmill-tests: %s" % (testname, testpath))
+      return self.error("Test '%s' specifies a test that doesn't exist: %s" % (testname, testpath))
     mozmillinst.tests = [ testpath ]
     
     # Run test
