@@ -19,6 +19,7 @@ class EnduranceTest(BenchTester.BenchTest):
   def setup(self):
     self.info("Setting up Endurance module")
     self.ready = True
+    self.endurance_results = None
     return True
   
   def endurance_event(self, obj):
@@ -28,6 +29,15 @@ class EnduranceTest(BenchTester.BenchTest):
     else:
       self.error("Got endurance test result with 0 iterations: %s" % obj)
   
+  def endurance_checkpoint(self, obj):
+    if obj['checkpoints']:
+      self.info("Got enduranceCheckpoint callback")
+      if not self.endurance_results:
+        self.endurance_results = { 'iterations': [] }
+      self.endurance_results.iterations.append(obj)
+    else:
+      self.error("Got endurance checkpoint with no data: %s" % obj)
+      
   def run_test(self, testname, testvars={}):
     if not self.ready:
       return self.error("run_test() called before setup")
@@ -47,6 +57,10 @@ class EnduranceTest(BenchTester.BenchTest):
     mozmillinst = mozmill.MozMill()
     mozmillinst.persisted['endurance'] = testvars
     mozmillinst.add_listener(self.endurance_event, eventType='mozmill.enduranceResults')
+    # enduranceCheckpoint is used in slimtest's endurance version
+    # to avoid keeping everything in the runtime (it records a lot of numbers,
+    # which in turn inflate memory usage, which it's trying to measure)
+    mozmillinst.add_listener(self.endurance_checkpoint, eventType='mozmill.enduranceCheckpoint')
     
     profile = mozrunner.FirefoxProfile(binary=self.tester.binary,
                                        profile=profdir,
