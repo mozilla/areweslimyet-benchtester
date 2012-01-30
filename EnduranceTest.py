@@ -34,7 +34,7 @@ class EnduranceTest(BenchTester.BenchTest):
       self.info("Got enduranceCheckpoint callback")
       if not self.endurance_results:
         self.endurance_results = { 'iterations': [] }
-      self.endurance_results.iterations.append(obj)
+      self.endurance_results['iterations'].append(obj)
     else:
       self.error("Got endurance checkpoint with no data: %s" % obj)
       
