@@ -108,11 +108,18 @@ class EnduranceTest(BenchTester.BenchTest):
       return self.error("Test did not return any endurance data!")
       
     results = {}
-    for iternum in range(len(self.endurance_results['iterations'])):
-      iteration = self.endurance_results['iterations'][iternum]
+    for x in range(len(self.endurance_results['iterations'])):
+      iteration = self.endurance_results['iterations'][x]
       for checkpoint in iteration['checkpoints']:
-        # Get rid of the [i:0, e:5] crap endurance adds
-        label = re.sub(" \[i:\d+ e:\d+\]$", "", checkpoint['label'])
+        # Endurance adds [i:0, e:5]
+        # Because iterations might not be in order when
+        # passed from enduranceCheckpoint, parse this.
+        label_re = re.match("^(.+) \[i:(\d+) e:\d+\]$", checkpoint['label'])
+        if not label_re:
+          self.error("Checkpoint '%s' doesn't look like an endurance checkpoint!" % checkpoint['label'])
+          next
+        iternum = int(label_re.group(2))
+        label = label_re.group(1)
         for memtype,memval in checkpoint['memory'].items():
           results[".".join(["Iteration %u" % iternum, label, "mem", memtype])] = memval
     
