@@ -121,7 +121,7 @@ class EnduranceTest(BenchTester.BenchTest):
         iternum = int(label_re.group(2))
         label = label_re.group(1)
         for memtype,memval in checkpoint['memory'].items():
-          results[".".join(["Iteration %u" % iternum, label, "mem", memtype])] = memval
+          results["/".join(["Iteration %u" % iternum, label, "mem", memtype])] = memval
     
     if not self.tester.add_test_results(testname, results):
       return self.error("Failed to save test results")
