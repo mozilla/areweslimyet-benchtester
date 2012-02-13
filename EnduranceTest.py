@@ -88,14 +88,7 @@ class EnduranceTest(BenchTester.BenchTest):
       return self.error("Endurance test run failed")
     
     self.info("Endurance - cleaning up")
-    # HACK
-    # jsbridge doesn't cleanup its polling thread properly,
-    # resulting in a 100% CPU thread being spawned for every
-    # time we re-create mozmill.
-    import thread
     try:
-      mozmillinst.bridge.handle_close = thread.exit
-      mozmillinst.back_channel.handle_close = thread.exit
       mozmillinst.stop()
     except Exception, e:
       self.error("Failed to properly cleanup mozmill")
