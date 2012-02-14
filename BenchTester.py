@@ -147,6 +147,10 @@ class BenchTester():
     if not (self.checkout() and self.build()):
       return False
     
+    # Buildname/buildtime shouldn't change past this point, so open the DB
+    # and make sure a record is created, even if no testdata is produced
+    self._open_db()
+    
     if self.modules.has_key(testtype):
       self.info("Passing test '%s' to module '%s'" % (testname, testtype))
       return self.modules[testtype].run_test(testname, testvars)
@@ -170,10 +174,8 @@ class BenchTester():
     return True
     
   def add_test_results(self, testname, datapoints):
-    if (not self.sqlite and self.args['sqlitedb']):
-      if not self._open_db():
-        self.error("Database open failed, wont be saving results")
-        self.args['sqlitedb'] = False
+    # Ensure DB is open
+    self._open_db()
     
     if not testname or not len(datapoints):
       return self.error("Invalid use of addDataPoint()")
@@ -331,11 +333,13 @@ class BenchTester():
       self.sqlite.rollback()
     
   def _open_db(self):
-    if self.sqlite: return True
+    if not self.args['sqlitedb'] or self.sqlite: return True
     
     self.info("Setting up SQLite")
     if not self.buildname or not self.buildtime:
-      return self.error("Cannot use db without a buildname and buildtime set")
+      self.error("Cannot use db without a buildname and buildtime set")
+      self.sqlitedb = self.args['sqlitedb'] = None
+      return False
     try:
       sql_path = os.path.abspath(self.args['sqlitedb'])
       self.sqlite = sqlite3.connect(sql_path)
@@ -352,14 +356,16 @@ class BenchTester():
         self.build_id = cur.fetchone()[0]
       elif buildrow[0] != int(self.buildtime):
         self.sqlite.rollback()
-        return self.error("Build '%s' already exists in the database, but with a different timestamp! (%s)" % (self.buildname, buildrow[0]))
+        self.error("Build '%s' already exists in the database, but with a different timestamp! (%s)" % (self.buildname, buildrow[0]))
+        self.sqlitedb = self.args['sqlitedb'] = None
+        return False
       else:
         self.build_id = buildrow[1]
         self.info("Found build record")
       self.sqlite.commit()
     except Exception, e:
       self.error("Failed to setup sqliteDB '%s': %s - %s\n" % (self.args['sqlitedb'], type(e), e))
-      self.sqlite = None
+      self.sqlitedb = self.args['sqlitedb'] = None
       return False
     
     return True
