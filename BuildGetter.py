@@ -19,6 +19,7 @@ import socket
 import cStringIO
 import shutil
 import tarfile
+import tempfile
 import datetime
 
 gBuildClasses = {}
@@ -36,12 +37,14 @@ def stat(msg):
 ## Utility
 ##
 
-# Given a firefox build file handle, extract it to CWD (usually creates ./firefox/)
+# Given a firefox build file handle, extract it to a temp directory, return that
 def _extract_build(fileobject):
   # cross-platform FIXME, this is hardcoded to .tar.bz2 at the moment
+  ret = tempfile.mkdtemp("BuildGetter_firefox")
   tar = tarfile.open(fileobj=fileobject, mode='r:bz2')
-  tar.extractall()
-  tar.close
+  tar.extractall(path=ret)
+  tar.close()
+  return ret
 
 ##
 ## Working with ftp.m.o
@@ -141,14 +144,14 @@ class FTPBuild(Build):
   def prepare(self):
     self._fetch()
     stat("Extracting build")
-    _extract_build(self._file)
+    self._extracted = _extract_build(self._file)
     self._file.close()
     self._prepared = True
 
   def cleanup(self):
     if self._prepared:
       self._prepared = False
-      shutil.rmtree("firefox")
+      shutil.rmtree(self._extracted)
 
   def get_revision(self):
     if not hasattr(self, '_revision'):
@@ -159,7 +162,7 @@ class FTPBuild(Build):
     if not self._prepared:
       raise Exception("Build is not prepared")
     # FIXME More hard-coded linux stuff
-    return os.path.join("firefox", "firefox")
+    return os.path.join(self._extracted, "firefox", "firefox")
 
   def get_buildtime(self):
     if not hasattr(self, '_timestamp'):
