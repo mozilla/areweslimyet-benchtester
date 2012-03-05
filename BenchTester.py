@@ -395,8 +395,8 @@ class BenchTester():
     self.info("Opened logfile")
     
     # Setup autobuild
-    if self.args['autobuild_repo']:
-      if not self.args['autobuild_mozconfig'] or not self.args['autobuild_objdir']:
+    if self.args.get('autobuild_repo'):
+      if not self.args.get('autobuild_mozconfig') or not self.args.get('autobuild_objdir'):
         return self.error("--autobuild-mozconfig and --autobuild-objdir are required for autobuild mode")
       self.objdirpath = self.args['autobuild_objdir']
       
@@ -423,7 +423,7 @@ class BenchTester():
       self.autobuild_pull = self.args['autobuild_pull']
       self.autobuild = True
     else:
-      if self.args['autobuild_log'] or self.args['autobuild_commit'] or self.args['autobuild_mozconfig'] or self.args['autobuild_objdir']:
+      if self.args.get('autobuild_log') or self.args.get('autobuild_commit') or self.args.get('autobuild_mozconfig') or self.args.get('autobuild_objdir'):
         return self.error("Autobuild options do not make sense without --autobuild-repo")
       self.autobuild = False
     
@@ -452,7 +452,7 @@ class BenchTester():
     if (self.args['buildname']):
       self.buildname = self.args['buildname'].strip()
     if (self.args['buildtime']):
-      self.buildtime = self.args['buildtime'].strip()
+      self.buildtime = str(self.args['buildtime']).strip()
 
     
     # Try to autodetect commitname/time if given a binary in a repo
