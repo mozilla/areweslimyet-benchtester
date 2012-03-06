@@ -14,12 +14,19 @@ import re
 class EnduranceTest(BenchTester.BenchTest):
   def __init__(self, parent):
     BenchTester.BenchTest.__init__(self, parent)
+    parent.add_argument('--jsbridge_port', help="Port to use for jsbridge, so concurrent tests don't collide")
     self.name = "EnduranceTest"
+    self.parent = parent
   
   def setup(self):
     self.info("Setting up Endurance module")
     self.ready = True
     self.endurance_results = None
+    
+    if 'jsbridge_port' in self.parent.args:
+      self.jsport = int(self.parent.args['jsbridge_port'])
+    else:
+      self.jsport = 24242
     return True
   
   def endurance_event(self, obj):
@@ -53,8 +60,8 @@ class EnduranceTest(BenchTester.BenchTest):
     #
     # Setup mozmill
     #
-    self.info("Mozmill - setting up")
-    mozmillinst = mozmill.MozMill()
+    self.info("Mozmill - setting up. Using jsbridge port %u" % (self.jsport,))
+    mozmillinst = mozmill.MozMill(jsbridge_port=self.jsport)
     mozmillinst.persisted['endurance'] = testvars
     mozmillinst.add_listener(self.endurance_event, eventType='mozmill.enduranceResults')
     # enduranceCheckpoint is used in slimtest's endurance version
@@ -70,6 +77,7 @@ class EnduranceTest(BenchTester.BenchTest):
                                        preferences={'startup.homepage_welcome_url' : '',
                                                     'startup.homepage_override_url' :''})
     runner = mozrunner.FirefoxRunner(binary=self.tester.binary, profile=profile)
+    runner.cmdargs += ['-jsbridge', str(self.jsport)]
     
     # Add test
     testpath = os.path.join(*testvars['test'])
