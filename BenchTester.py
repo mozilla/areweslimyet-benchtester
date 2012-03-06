@@ -36,13 +36,10 @@ gTableSchemas = [
 
 # TODO:
 # - doxygen
+# - Add indexes to sqlitedb by default
 # - add more self.info checkpoints
-# - Build/mozmill output might need logging. --autobuild-log?
 #
-# - Make work on OS X/Windows:
-#   - Make autobuild detect when to use pymake
-#   - msvc builds...?
-#   - hardcoded 'dist/bin/firefox' not valid for other platforms
+# - Test and fix if necessary on OS X / Win
 
 # Runs the mozmill memory tests and generates/updates a json data object with
 # results
@@ -95,60 +92,12 @@ class BenchTester():
     
     if not noprint:
       self.out.write("[%.2f] %s: %s\n" % (timestamp, type.upper(), msg))
-  
-  def build(self):
-    if not self.autobuild or self.built: return True
-    
-    if not self.ready:
-      return self.error("build() called before successful setup()")
-    if not self.autobuild:
-      return self.error("build() called when not configured for autobuild")
-    try:
-      mozconfig = os.path.abspath(self.mozconfig)
-    except:
-      return self.error("Failed to resolve '%s' to an absolute path" % self.mozconfig)
-    if not os.path.exists(mozconfig):
-        return self.error("File does not exist: %s" % self.mozconfig)
-      
-    newenv = os.environ.copy()
-    newenv['MOZCONFIG'] = mozconfig
-    
-    self.info("Beginning build")
-    try:
-      proc = subprocess.Popen(['make', '-f', 'client.mk'],
-                              env=newenv,
-                              cwd=self.repopath,
-                              stderr=subprocess.STDOUT,
-                              stdout=subprocess.PIPE)
-    except Exception, e:
-      return self.error("Build triggered an exception: %s" % e)
-    
-    # Wait for EOF, logging if desired
-    while True:
-      data = proc.stdout.read(1024)
-      if not data: break
-      if self.autobuild_logfile:
-        self.autobuild_logfile.write(data)
-        
-    ret = proc.wait()
-    if ret == 0:
-      self.info("Build successful")
-    else:
-      return self.error("Build failed")
-      
-    self.built = True
-    return True
     
   def run_test(self, testname, testtype, testvars={}):
     if not self.ready:
       return self.error("run_test() called before setup")
-    
-    # Make sure checkout and build have been done
-    if not (self.checkout() and self.build()):
-      return False
-    
-    # Buildname/buildtime shouldn't change past this point, so open the DB
-    # and make sure a record is created, even if no testdata is produced
+
+    # make sure a record is created, even if no testdata is produced
     self._open_db()
     
     if self.modules.has_key(testtype):
@@ -199,61 +148,6 @@ class BenchTester():
         return False
     return True
     
-  def checkout(self):
-    if not self.autobuild or self.checked_out: return True
-    
-    if not self.ready:
-      return self.error("checkout() called before successful setup()")
-    
-    if self.autobuild_pull:
-      self.info("Beginning mercurial pull")
-      try:
-        self.hg_ui.pushbuffer()
-        self.hg_ui.readconfig(os.path.join(self.repopath, ".hg", "hgrc"))
-        mercurial.commands.pull(self.hg_ui, self.repo, update=True, check=True)
-        result = self.hg_ui.popbuffer()
-        if self.autobuild_logfile:
-          self.autobuild_logfile.write(result)
-      except Exception, e:
-        return self.error("Failed to pull mercurial repo, Exception '%s': %s" % (type(e), e))
-    
-    try:
-      self.hg_ui.pushbuffer()
-      if self.args['autobuild_commit']:
-        commitname=self.args['autobuild_commit']
-        docheckout = True
-      else:
-        commitname="." # use currently checked out files
-        docheckout = False
-      self.info("Looking up commit info in autobuild repo for '%s'" % commitname)
-      mercurial.commands.log(self.hg_ui, self.repo, rev=[commitname], template="{node} {date}", date="", user=None, follow=None)
-      commitinfo = self.hg_ui.popbuffer().split()
-    except Exception, e:
-      return self.error("Failed to get info about specified commit in autobuild repository: %s" % e)
-    self.commit = commitinfo[0]
-    # If not set, seed testname/time with defaults from this commit
-    committime = commitinfo[1].split('.')[0] # {date} produces a timestamp of format '123234234.0-3600'
-    if not self.buildname: self.buildname = self.commit
-    if not self.buildtime: self.buildtime = committime
-    self.info("Autobuilding commit '%s' with timestamp '%s'" % (self.commit, committime))
-    
-    if not docheckout:
-      self.info("No commit specified, not checking anything out and using existing tree")
-      self.checked_out = True
-      return True
-
-    self.info("Beginning mercurial checkout")
-    try:
-      self.hg_ui.pushbuffer()
-      mercurial.commands.update(self.hg_ui, self.repo, self.commit, check=True)
-      result = self.hg_ui.popbuffer()
-      if self.autobuild_logfile:
-        self.autobuild_logfile.write(result)
-    except Exception, e:
-      return self.error("Failed to checkout revision '%s', Error: %s" % (self.commit, e))
-    self.info("Succesfully checked out revision '%s'" % self.commit)
-    return True
-    
   def __init__(self, out=sys.stdout):
     self.starttime = time.clock()
     self.ready = False
@@ -264,35 +158,20 @@ class BenchTester():
     self.modules = {}
     self.logfile = None
     self.buildtime = None
-    self.autobuild_logfile = None
     self.buildname = None
     self.sqlite = False
-    self.checked_out = False
-    self.built = False
     
     # These can be passed to setup() like so:
-    #   mytester.setup({'binary': 'blah', 'autobuild_repo': 'blee'})
+    #   mytester.setup({'binary': 'blah', 'buildname': 'blee'})
     # OR you can call mytester.parseArgs() on a command-line formatted arg list (sys.argv) to extract
     #   them as needed.
     self.add_argument('-b', '--binary',              help='The binary (either in the current PATH or a full path) to test')
-    self.add_argument('--autobuild-repo',            help='Automatically build and test a commit using this local repo')
-    self.add_argument('--autobuild-commit',          help='In autobuild mode, the commit (changeset) to checkout, otherwise \
-                                                           defaults to currently checked out revision (including uncommited \
-                                                           changes!)')
-    self.add_argument('--autobuild-mozconfig',       help='Path to a mozconfig to use for test builds in autobuild mode')
-    self.add_argument('--autobuild-pull',            help='Run a pull on the repository before checking out commit. Useful \
-                                                           with "--autobuild-commit tip"',
-                                                     action='store_true')
-    self.add_argument('--autobuild-objdir',          help='Path to object directory (absolute or relative to repo) that \
-                                                           given mozconfig will output')
-    self.add_argument('--autobuild-log',             help='Dump build output to given file')
     self.add_argument('--buildname',                 help='The name of this firefox build. If omitted, attempts to use the \
                                                            commit id from the mercurial respository the binary resides \
-                                                           in, or the changeset id in autobuild mode')
+                                                           in')
     self.add_argument('--buildtime',                 help='The unix timestamp to assign to this build \
                                                            build. If omitted, attempts to use the commit timestamp \
-                                                           from the mercurial repository the binary resides in, or of \
-                                                           the changeset being tested in autobuild mode')
+                                                           from the mercurial repository the binary resides in')
     self.add_argument('--test-module', '-m',         help='Load the specified test module (from libs). You must load at least one module to have tests',
                                                      action='append')
     self.add_argument('-l', '--logfile',             help='Log to given file')
@@ -394,59 +273,15 @@ class BenchTester():
         self.logcache = None
     self.info("Opened logfile")
     
-    # Setup autobuild
-    if self.args.get('autobuild_repo'):
-      if not self.args.get('autobuild_mozconfig') or not self.args.get('autobuild_objdir'):
-        return self.error("--autobuild-mozconfig and --autobuild-objdir are required for autobuild mode")
-      self.objdirpath = self.args['autobuild_objdir']
-      
-      try:
-        self.repopath = os.path.abspath(self.args['autobuild_repo'])
-        self.repo = mercurial.hg.repository(self.hg_ui, self.repopath)
-      except Exception, e:
-        return self.error("Error opening '%s' as a mercurial repository: %s" % (self.args['autobuild_repo'], e))
-      
-      try:
-        self.mozconfig = os.path.abspath(self.args['autobuild_mozconfig'])
-      except:
-        return self.error("Failed to resolve file to an absolute path: %s" % e)
-      
-      if not os.path.exists(self.mozconfig):
-        return self.error("Given mozconfig does not exist (%s)" % self.mozconfig)
-      
-      if self.args['autobuild_log']:
-        try:
-          self.autobuild_logfile = open(self.args['autobuild_log'], 'w')
-        except Exception, e:
-          self.error("Failed to open log file '%s' for writing" % self.args['autobuild_log'])
-        self.info("Opened build log file")
-      self.autobuild_pull = self.args['autobuild_pull']
-      self.autobuild = True
-    else:
-      if self.args.get('autobuild_log') or self.args.get('autobuild_commit') or self.args.get('autobuild_mozconfig') or self.args.get('autobuild_objdir'):
-        return self.error("Autobuild options do not make sense without --autobuild-repo")
-      self.autobuild = False
-    
-    # Check that binary or autobuild is set
-    if self.autobuild:
-      if self.args['binary']:
-        return self.error("Specifying a binary does not make sense in conjunction with autobuild")
-      try:
-        # FIXME
-        # This isn't right for non-Linux
-        self.binary = os.path.abspath(os.path.join(self.args['autobuild_objdir'], 'dist', 'bin', 'firefox'))
-      except:
-        return self.error("Couldn't resolve absolute path of provided objdir (%s)" % self.args['autobuild_objdir'])
-      
-    else:
-      if not self.args['binary']:
-        return self.error("--binary is required if not using autobuild mode, see --help")
-      try:
-        self.binary = os.path.abspath(self.args['binary'])
-      except:
-        self.binary = False
-      if not self.binary or not os.path.exists(self.binary):
-        return self.error("Unable to access binary '%s' (abs: '%s')\n" % (self.args['binary'], self.binary if self.binary else "Cannot resolve"))
+    # Check that binary is set
+    if not self.args['binary']:
+      return self.error("--binary is required, see --help")
+    try:
+      self.binary = os.path.abspath(self.args['binary'])
+    except:
+      self.binary = False
+    if not self.binary or not os.path.exists(self.binary):
+      return self.error("Unable to access binary '%s' (abs: '%s')\n" % (self.args['binary'], self.binary if self.binary else "Cannot resolve"))
     
     # Set commit name/timestamp
     if (self.args['buildname']):
@@ -456,7 +291,7 @@ class BenchTester():
 
     
     # Try to autodetect commitname/time if given a binary in a repo
-    if not self.autobuild and (not self.buildname or not self.buildtime):
+    if not self.buildname or not self.buildtime:
       try:
         hg_repo = mercurial.hg.repository(self.hg_ui, os.path.dirname(self.binary))
       except:

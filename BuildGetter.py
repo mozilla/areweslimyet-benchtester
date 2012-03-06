@@ -21,8 +21,9 @@ import shutil
 import tarfile
 import tempfile
 import datetime
+import subprocess
 
-gBuildClasses = {}
+output = sys.stderr
 
 socket.setdefaulttimeout(30)
 
@@ -30,12 +31,31 @@ socket.setdefaulttimeout(30)
 # This currently selects the linux-64 (non-pgo) build
 # hardcoded at a few spots. This will need to be changed for non-linux testing
 
-def stat(msg):
-  sys.stderr.write("%s\n" % msg);
+def _stat(msg):
+  output.write("[BuildGetter] %s\n" % msg);
 
 ##
 ## Utility
 ##
+
+def _subprocess(environment, command, cwd, logfile):
+  newenv = os.environ.copy()
+  newenv.update(environment)
+
+  proc = subprocess.Popen(command,
+                          env=newenv,
+                          cwd=cwd,
+                          stderr=subprocess.STDOUT,
+                          stdout=subprocess.PIPE)
+
+  # Wait for EOF, logging if desired
+  while True:
+    data = proc.stdout.read(1024)
+    if not data: break
+    if logfile:
+      logfile.write(data)
+
+  return proc.wait()
 
 # Given a firefox build file handle, extract it to a temp directory, return that
 def _extract_build(fileobject):
@@ -69,7 +89,7 @@ def _ftp_get(ftp, filename):
 # otherwise returns a tuple of (timestamp, revision, filename)
 def _ftp_check_build_dir(ftp, dirname):
   global infofile
-  stat("Checking directory %s" % dirname)
+  _stat("Checking directory %s" % dirname)
   infofile = False
   def findinfofile(line):
     global infofile
@@ -90,7 +110,7 @@ def _ftp_check_build_dir(ftp, dirname):
   filedat = fileio.getvalue()
   fileio.close()
 
-  stat("Got build info: %s" % filedat)
+  _stat("Got build info: %s" % filedat)
 
   m = re.search('^[0-9]{14}', filedat)
   timestamp = int(time.mktime(time.strptime(m.group(0), '%Y%m%d%H%M%S')))
@@ -143,10 +163,11 @@ class Build():
 class FTPBuild(Build):
   def prepare(self):
     self._fetch()
-    stat("Extracting build")
+    _stat("Extracting build")
     self._extracted = _extract_build(self._file)
     self._file.close()
     self._prepared = True
+    return True
 
   def cleanup(self):
     if self._prepared:
@@ -168,7 +189,137 @@ class FTPBuild(Build):
     if not hasattr(self, '_timestamp'):
       raise Exception("Build is not prepared")
     return self._timestamp
+
+# A build that needs to be compiled
+# repo - The local repo to use to build (must be cloned first)
+# commit - If set, checkout this commit
+# mozconfig - The mozconfig file to use to build
+# pull - If true, pull before building/checking-out
+# objdir - the object directory said mozconfig will create
+# log - If set, where to put build spew
+class CompileBuild(Build):
+  def __init__(self, repo, mozconfig, objdir, pull=False, commit=None, log=None):
+    self._repopath = repo
+    self._checkout = commit
+    self._commit = None
+    self._mozconfig = mozconfig
+    self._pull = pull
+    self._objdir = objdir
+    self._log = log
+    self._logfile = None
+      
+  def prepare(self):
+    ##
+    ## Sanity checks, open log
+    ##
+    if not os.path.exists(self._mozconfig):
+      raise Exception("Mozconfig given to CompileBuild does not exist")
+    if not os.path.exists(self._repopath) or not os.path.exists(os.path.join(self._repopath, ".hg")):
+      raise Exception("Given repo does not exist or is not a mercurial repo")
+    if self._log:
+      self._logfile = open(self._log, 'w')
+
+    ##
+    ## Setup HG, pull if wanted
+    ##
+    import mercurial, mercurial.ui, mercurial.hg, mercurial.commands
+    hg_ui = mercurial.ui.ui()
+    repo = mercurial.hg.repository(hg_ui, self._repopath)
     
+    if self._pull:
+      _stat("Beginning mercurial pull")
+      hg_ui.pushbuffer()
+      hg_ui.readconfig(os.path.join(self._repopath, ".hg", "hgrc"))
+      mercurial.commands.pull(hg_ui, repo, update=True, check=True)
+      result = hg_ui.popbuffer()
+      if self._logfile:
+        self._logfile.write(result)
+
+    ##
+    ## Get info about commit
+    ##
+    commitname = self._checkout if self._checkout else "."
+    hg_ui.pushbuffer()
+    mercurial.commands.log(hg_ui, repo, rev=[commitname], template="{node} {date}", date="", user=None, follow=None)
+    commitinfo = hg_ui.popbuffer().split()
+    self._commit = commitinfo[0]
+    # If not set, seed testname/time with defaults from this commit
+    self._committime = commitinfo[1].split('.')[0] # {date} produces a timestamp of format '123234234.0-3600'
+
+    ##
+    ## Checkout if needed
+    ##
+    if self._checkout:
+      hg_ui.pushbuffer()
+      mercurial.commands.update(hg_ui, repo, self._checkout, check=True)
+      result = hg_ui.popbuffer()
+      if self._logfile:
+        self._logfile.write(result)
+
+    _stat("Building")
+    # Build
+    def build():
+      return _subprocess({ 'MOZCONFIG' : self._mozconfig }, [ 'make', '-f', 'client.mk' ], self._repopath, self._logfile)
+
+    ret = build()
+    if ret != 0 and os.path.exists(self._objdir):
+      _stat("Build failed, trying again with fresh object directory")
+      shutil.rmtree(self._objdir)
+      ret = build()
+      
+    if ret != 0:
+      _stat("Build with fresh object directory failed")
+      return False
+
+    _stat("Packaging")
+    # Package
+    ret = _subprocess({}, [ 'make', 'package' ], self._objdir, self._logfile)
+    if ret != 0:
+      _stat("Package failed")
+      return False
+      
+    # Find package file
+    # FIXME linux-specific
+    files = os.listdir(os.path.join(self._objdir, "dist"))
+    package = None
+    for f in files:
+      if f.startswith("firefox-") and f.endswith(".tar.bz2"):
+        package = f
+        break
+    if not package:
+      _stat("Failed to find built package")
+      return False
+
+    # Extract
+    package = open(package, 'r')
+    self._extracted = _extract_build(package)
+    package.close()
+
+    self._prepared = True
+    return True
+
+  def cleanup(self):
+    if self._prepared:
+      shutil.rmdir(self._extracted)
+      self._prepared = False
+    return True;
+
+  def get_buildtime(self):
+    if not self._prepared:
+      raise Exception("CompileBuild is not prepared")
+    return self._committime
+
+  def get_binary(self):
+    if not self._prepared:
+      raise Exception("CompileBuild is not prepared")
+    # More linux-specific stuff
+    return os.path.join(self._extracted, "firefox", "firefox")
+
+  def get_revision(self):
+    if not self._prepared:
+      raise Exception("CompileBuild is not prepared")
+    return self._commit
+
 # A nightly build. Initialized with a date() object or a YYYY-MM-DD string
 class NightlyBuild(FTPBuild):
   def __init__(self, date):
@@ -180,7 +331,7 @@ class NightlyBuild(FTPBuild):
     month = self._date.month
     day = self._date.day
     year = self._date.year
-    stat("Looking up nightly for %s/%s, %s" % (month, day, year))
+    _stat("Looking up nightly for %s/%s, %s" % (month, day, year))
 
     # Connect, CD to this month's dir
     ftp = ftplib.FTP('ftp.mozilla.org')
@@ -201,7 +352,7 @@ class NightlyBuild(FTPBuild):
     if not len(nightlydirs):
       raise Exception("Failed to find any nightly directory for date %s/%s/%s" % (month, day, year))
 
-    stat("Nightly directories are: %s" % ', '.join(nightlydirs))
+    _stat("Nightly directories are: %s" % ', '.join(nightlydirs))
 
     for x in nightlydirs:
       (timestamp, revision, filename) = _ftp_check_build_dir(ftp, x)
@@ -216,8 +367,6 @@ class NightlyBuild(FTPBuild):
     self._timestamp = timestamp
     self._revision = revision
     self._file = nightlyfile
-
-gBuildClasses['nightly'] = NightlyBuild
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(FTPBuild):
@@ -235,5 +384,3 @@ class TinderboxBuild(FTPBuild):
 
     self._file = _ftp_get(ftp, filename)
     ftp.close()
-
-gBuildClasses['tinderbox'] = TinderboxBuild
