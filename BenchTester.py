@@ -35,7 +35,7 @@ gTableSchemas = [
 ];
 
 # TODO:
-# - doxygen
+# - doxygen or at least some sort of documentation
 # - Add indexes to sqlitedb by default
 # - add more self.info checkpoints
 #
@@ -43,7 +43,8 @@ gTableSchemas = [
 
 # Runs the mozmill memory tests and generates/updates a json data object with
 # results
-# - Currently used to graph the data on areweslimyet.com
+# - Currently used to graph the data on areweslimyet.com. The areweslimyet repo
+#   is a good example of using this, given the lack of docs
 
 class BenchTest():
   def __init__(self, parent):
