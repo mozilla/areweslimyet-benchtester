@@ -91,7 +91,8 @@ class EnduranceTest(BenchTester.BenchTest):
     try:
       mozmillinst.start(profile=runner.profile, runner=runner)
       self.info("Endurance - running test")
-      successful = mozmillinst.run_tests(mozmillinst.tests)
+      mozmillinst.run_tests(mozmillinst.tests)
+      successful = len(mozmillinst.fails) == 0
     except Exception, e:
       try:
         mozmillinst.stop()
