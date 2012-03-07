@@ -93,6 +93,8 @@ class EnduranceTest(BenchTester.BenchTest):
       self.info("Endurance - running test")
       mozmillinst.run_tests(mozmillinst.tests)
     except Exception, e:
+      try: mozmillinst.stop()
+      except: pass
       return self.error("Endurance test run failed")
     
     self.info("Endurance - cleaning up")
