@@ -215,7 +215,7 @@ class BenchTester():
       self.sqlite.rollback()
     
   def _open_db(self):
-    if not self.args['sqlitedb'] or self.sqlite: return True
+    if not self.args['sqlitedb'] or self.sqlite: return False
     
     self.info("Setting up SQLite")
     if not self.buildname or not self.buildtime:
@@ -239,7 +239,7 @@ class BenchTester():
       elif buildrow[0] != int(self.buildtime):
         self.sqlite.rollback()
         self.error("Build '%s' already exists in the database, but with a different timestamp! (%s)" % (self.buildname, buildrow[0]))
-        self.sqlitedb = self.args['sqlitedb'] = None
+        self.sqlite = self.sqlitedb = self.args['sqlitedb'] = None
         return False
       else:
         self.build_id = buildrow[1]
