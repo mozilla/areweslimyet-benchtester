@@ -121,6 +121,26 @@ def _ftp_check_build_dir(ftp, dirname):
 
   return (timestamp, rev, nightlyfile)
 
+# Returns a list of commit IDs between two revisions, inclusive. If pullfirst is
+# set, pull before checking
+def get_hg_range(repodir, firstcommit, lastcommit, pullfirst=False):
+    # Setup Hg
+    import mercurial, mercurial.ui, mercurial.hg, mercurial.commands
+    hg_ui = mercurial.ui.ui()
+    repo = mercurial.hg.repository(hg_ui, repodir)
+    hg_ui.readconfig(os.path.join(repodir, ".hg", "hgrc"))
+    
+    # Pull
+    if pullfirst:
+      hg_ui.pushbuffer()
+      mercurial.commands.pull(hg_ui, repo, update=True, check=True)
+      result = hg_ui.popbuffer()
+
+    # Get revisions
+    hg_ui.pushbuffer()
+    mercurial.commands.log(hg_ui, repo, rev=[ "%s:%s" % (firstcommit, lastcommit) ], template="{node} ", date="", user=None, follow=None)
+    return hg_ui.popbuffer().split(' ')[:-1]
+  
 # Gets a list of TinderboxBuild objects for all builds on ftp.m.o within
 # specified date range
 def get_tinderbox_builds(starttime = 0, endtime = int(time.time())):
