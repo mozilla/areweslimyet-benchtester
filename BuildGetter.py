@@ -173,8 +173,6 @@ class Build():
     raise Exception("Attempt to call method on abstract base class")
   def cleanup(self):
     raise Exception("Attempt to call method on abstract base class")
-  def get_name(self):
-    raise Exception("Attempt to call method on abstract base class")
   def get_revision(self):
     raise Exception("Attempt to call method on abstract base class")
   def get_buildtime(self):
@@ -200,8 +198,8 @@ class FTPBuild(Build):
     return True
 
   def get_revision(self):
-    if not hasattr(self, '_revision'):
-      raise Exception("Build is not prepared")
+    if not self._revision:
+      self._fetch(True)
     return self._revision
 
   def get_binary(self):
@@ -232,9 +230,6 @@ class CompileBuild(Build):
     self._objdir = objdir
     self._log = log
     self._logfile = None
-
-  def get_name(self):
-    return "CompileBuild for commit %s" % (self._commit,)
     
   def prepare(self):
     ##
@@ -348,8 +343,6 @@ class CompileBuild(Build):
     return os.path.join(self._extracted, "firefox", "firefox")
 
   def get_revision(self):
-    if not self._prepared:
-      raise Exception("CompileBuild is not prepared")
     return self._commit
 
 # A nightly build. Initialized with a date() object or a YYYY-MM-DD string
@@ -358,11 +351,8 @@ class NightlyBuild(FTPBuild):
     self._prepared = False
     self._date = date
 
-  def get_name(self):
-    return "NightlyBuild for %s-%s-%s" % (self._date.year, self._date.month, self._date.day)
-
   # Get this build from ftp.m.o
-  def _fetch(self):
+  def _fetch(self, noDL=False):
     month = self._date.month
     day = self._date.day
     year = self._date.year
@@ -398,20 +388,17 @@ class NightlyBuild(FTPBuild):
     if not revision:
       raise Exception("Couldn't find any directory with info on this build :(")
 
-    nightlyfile = _ftp_get(ftp, filename)
+    if not noDL:
+      self._file = _ftp_get(ftp, filename)
     ftp.close()
     self._timestamp = timestamp
     self._revision = revision
-    self._file = nightlyfile
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(FTPBuild):
   def __init__(self, timestamp):
     self._timestamp = int(timestamp)
     self._prepared = False
-
-  def get_name(self):
-    return "TinderboxBuild %u" % (self._timestamp,)
 
   def _fetch(self):
     ftp = ftplib.FTP('ftp.mozilla.org')
