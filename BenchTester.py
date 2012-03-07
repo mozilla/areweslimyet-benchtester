@@ -126,8 +126,7 @@ class BenchTester():
     
   def add_test_results(self, testname, datapoints, succeeded=True):
     # Ensure DB is open
-    if not self._open_db():
-      return
+    self._open_db()
     
     if not testname or not len(datapoints):
       return self.error("Invalid use of addDataPoint()")
@@ -215,7 +214,7 @@ class BenchTester():
       self.sqlite.rollback()
     
   def _open_db(self):
-    if not self.args['sqlitedb'] or self.sqlite: return False
+    if not self.args['sqlitedb'] or self.sqlite: return True
     
     self.info("Setting up SQLite")
     if not self.buildname or not self.buildtime:
