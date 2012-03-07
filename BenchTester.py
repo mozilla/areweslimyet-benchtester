@@ -24,7 +24,8 @@ gTableSchemas = [
       "benchtester_tests" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                          "name" VARCHAR NOT NULL,
                          "time" DATETIME NOT NULL,
-                         "build_id" INTEGER NOT NULL)''',
+                         "build_id" INTEGER NOT NULL),
+                         "successful" INTEGER NOT NULL''',
                          
   # Data - datapoints from tests
   '''CREATE TABLE IF NOT EXISTS
@@ -123,9 +124,10 @@ class BenchTester():
         
     return True
     
-  def add_test_results(self, testname, datapoints):
+  def add_test_results(self, testname, datapoints, succeeded=True):
     # Ensure DB is open
-    self._open_db()
+    if not self._open_db():
+      return
     
     if not testname or not len(datapoints):
       return self.error("Invalid use of addDataPoint()")
@@ -137,7 +139,7 @@ class BenchTester():
     if self.sqlite:
       try:
         cur = self.sqlite.cursor()
-        cur.execute("INSERT INTO `benchtester_tests` (`name`, `time`, `build_id`) VALUES (?, ?, ?)", (testname, int(timestamp), self.build_id))
+        cur.execute("INSERT INTO `benchtester_tests` (`name`, `time`, `build_id`, `successful`) VALUES (?, ?, ?, ?)", (testname, int(timestamp), self.build_id, succeeded))
         cur.execute("SELECT last_insert_rowid()")
         testid = cur.fetchone()[0]
         for datapoint, val in datapoints.iteritems():
