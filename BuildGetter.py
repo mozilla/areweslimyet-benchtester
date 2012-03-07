@@ -23,7 +23,7 @@ import tempfile
 import datetime
 import subprocess
 
-output = sys.stderr
+output = sys.stdout
 
 socket.setdefaulttimeout(30)
 
@@ -41,6 +41,7 @@ def _stat(msg):
 def _subprocess(environment, command, cwd, logfile):
   newenv = os.environ.copy()
   newenv.update(environment)
+  _stat("Running command \"%s\" in \"%s\" with env \"%s\"" % (command, cwd, environment))
 
   proc = subprocess.Popen(command,
                           env=newenv,
@@ -152,6 +153,8 @@ class Build():
     raise Exception("Attempt to call method on abstract base class")
   def cleanup(self):
     raise Exception("Attempt to call method on abstract base class")
+  def get_name(self):
+    raise Exception("Attempt to call method on abstract base class")
   def get_revision(self):
     raise Exception("Attempt to call method on abstract base class")
   def get_buildtime(self):
@@ -166,6 +169,7 @@ class FTPBuild(Build):
     _stat("Extracting build")
     self._extracted = _extract_build(self._file)
     self._file.close()
+    self._file = None
     self._prepared = True
     return True
 
@@ -173,6 +177,7 @@ class FTPBuild(Build):
     if self._prepared:
       self._prepared = False
       shutil.rmtree(self._extracted)
+    return True
 
   def get_revision(self):
     if not hasattr(self, '_revision'):
@@ -207,7 +212,10 @@ class CompileBuild(Build):
     self._objdir = objdir
     self._log = log
     self._logfile = None
-      
+
+  def get_name(self):
+    return "CompileBuild for commit %s" % (self._commit,)
+    
   def prepare(self):
     ##
     ## Sanity checks, open log
@@ -238,6 +246,7 @@ class CompileBuild(Build):
     ##
     ## Get info about commit
     ##
+    _stat("Getting commit info")
     commitname = self._checkout if self._checkout else "."
     hg_ui.pushbuffer()
     mercurial.commands.log(hg_ui, repo, rev=[commitname], template="{node} {date}", date="", user=None, follow=None)
@@ -245,13 +254,15 @@ class CompileBuild(Build):
     self._commit = commitinfo[0]
     # If not set, seed testname/time with defaults from this commit
     self._committime = commitinfo[1].split('.')[0] # {date} produces a timestamp of format '123234234.0-3600'
+    _stat("Commit is %s @ %s" % (self._commit, self._committime))
 
     ##
     ## Checkout if needed
     ##
     if self._checkout:
+      _stat("Performing checkout")
       hg_ui.pushbuffer()
-      mercurial.commands.update(hg_ui, repo, self._checkout, check=True)
+      mercurial.commands.update(hg_ui, repo, node=self._checkout, check=True)
       result = hg_ui.popbuffer()
       if self._logfile:
         self._logfile.write(result)
@@ -259,7 +270,7 @@ class CompileBuild(Build):
     _stat("Building")
     # Build
     def build():
-      return _subprocess({ 'MOZCONFIG' : self._mozconfig }, [ 'make', '-f', 'client.mk' ], self._repopath, self._logfile)
+      return _subprocess({ 'MOZCONFIG' : os.path.abspath(self._mozconfig) }, [ 'make', '-f', 'client.mk' ], self._repopath, self._logfile)
 
     ret = build()
     if ret != 0 and os.path.exists(self._objdir):
@@ -280,11 +291,12 @@ class CompileBuild(Build):
       
     # Find package file
     # FIXME linux-specific
-    files = os.listdir(os.path.join(self._objdir, "dist"))
+    distdir = os.path.join(self._objdir, "dist")
+    files = os.listdir(distdir)
     package = None
     for f in files:
       if f.startswith("firefox-") and f.endswith(".tar.bz2"):
-        package = f
+        package = os.path.join(distdir, f)
         break
     if not package:
       _stat("Failed to find built package")
@@ -300,7 +312,7 @@ class CompileBuild(Build):
 
   def cleanup(self):
     if self._prepared:
-      shutil.rmdir(self._extracted)
+      shutil.rmtree(self._extracted)
       self._prepared = False
     return True;
 
@@ -325,7 +337,10 @@ class NightlyBuild(FTPBuild):
   def __init__(self, date):
     self._prepared = False
     self._date = date
-    
+
+  def get_name(self):
+    return "NightlyBuild for %s-%s-%s" % (self._date.year, self._date.month, self._date.day)
+
   # Get this build from ftp.m.o
   def _fetch(self):
     month = self._date.month
@@ -355,8 +370,9 @@ class NightlyBuild(FTPBuild):
     _stat("Nightly directories are: %s" % ', '.join(nightlydirs))
 
     for x in nightlydirs:
-      (timestamp, revision, filename) = _ftp_check_build_dir(ftp, x)
-      if revision:
+      ret = _ftp_check_build_dir(ftp, x)
+      if ret:
+        (timestamp, revision, filename) = ret
         break
 
     if not revision:
@@ -373,6 +389,9 @@ class TinderboxBuild(FTPBuild):
   def __init__(self, timestamp):
     self._timestamp = int(timestamp)
     self._prepared = False
+
+  def get_name(self):
+    return "TinderboxBuild %u" % (self._timestamp,)
 
   def _fetch(self):
     ftp = ftplib.FTP('ftp.mozilla.org')
