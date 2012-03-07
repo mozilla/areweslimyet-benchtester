@@ -91,7 +91,7 @@ class EnduranceTest(BenchTester.BenchTest):
     try:
       mozmillinst.start(profile=runner.profile, runner=runner)
       self.info("Endurance - running test")
-      mozmillinst.run_tests(mozmillinst.tests)
+      successful = mozmillinst.run_tests(mozmillinst.tests)
     except Exception, e:
       try:
         mozmillinst.stop()
@@ -128,7 +128,7 @@ class EnduranceTest(BenchTester.BenchTest):
         for memtype,memval in checkpoint['memory'].items():
           results["/".join(["Iteration %u" % iternum, label, memtype])] = memval
     
-    if not self.tester.add_test_results(testname, results):
+    if not self.tester.add_test_results(testname, results, successful):
       return self.error("Failed to save test results")
     self.info("Test '%s' complete" % testname)
     return True
