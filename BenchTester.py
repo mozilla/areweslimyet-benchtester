@@ -24,8 +24,8 @@ gTableSchemas = [
       "benchtester_tests" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                          "name" VARCHAR NOT NULL,
                          "time" DATETIME NOT NULL,
-                         "build_id" INTEGER NOT NULL),
-                         "successful" INTEGER NOT NULL''',
+                         "build_id" INTEGER NOT NULL,
+                         "successful" INTEGER NOT NULL)''',
                          
   # Data - datapoints from tests
   '''CREATE TABLE IF NOT EXISTS
