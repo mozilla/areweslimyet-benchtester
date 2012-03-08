@@ -188,6 +188,8 @@ class FTPBuild(Build):
     self._extracted = _extract_build(self._file)
     self._file.close()
     self._file = None
+    self._timestamp = None
+    self._revision = None
     self._prepared = True
     return True
 
@@ -209,8 +211,8 @@ class FTPBuild(Build):
     return os.path.join(self._extracted, "firefox", "firefox")
 
   def get_buildtime(self):
-    if not hasattr(self, '_timestamp'):
-      raise Exception("Build is not prepared")
+    if not self._timestamp:
+      self._fetch(True)
     return self._timestamp
 
 # A build that needs to be compiled
