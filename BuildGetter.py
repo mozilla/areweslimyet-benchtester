@@ -404,7 +404,7 @@ class TinderboxBuild(FTPBuild):
     self._timestamp = int(timestamp)
     self._prepared = False
 
-  def _fetch(self):
+  def _fetch(self, noDL=False):
     ftp = ftplib.FTP('ftp.mozilla.org')
     ftp.login()
     ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/mozilla-central-linux64/')
@@ -412,6 +412,7 @@ class TinderboxBuild(FTPBuild):
     if not self._timestamp:
       return False
 
-    self._file = _ftp_get(ftp, filename)
+    if not noDL:
+      self._file = _ftp_get(ftp, filename)
     ftp.close()
     return True
