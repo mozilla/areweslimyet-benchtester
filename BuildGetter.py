@@ -138,8 +138,12 @@ def get_hg_range(repodir, firstcommit, lastcommit, pullfirst=False):
 
     # Get revisions
     hg_ui.pushbuffer()
-    mercurial.commands.log(hg_ui, repo, rev=[ "%s:%s" % (firstcommit, lastcommit) ], template="{node} ", date="", user=None, follow=None)
-    return hg_ui.popbuffer().split(' ')[:-1]
+    try:
+      mercurial.commands.log(hg_ui, repo, rev=[ "%s:%s" % (firstcommit, lastcommit) ], template="{node} ", date="", user=None, follow=None)
+      return hg_ui.popbuffer().split(' ')[:-1]
+    except:
+      # mercurial throws all kinds of fun exceptions for bad input
+      return False
   
 # Gets a list of TinderboxBuild objects for all builds on ftp.m.o within
 # specified date range
