@@ -169,6 +169,7 @@ def get_tinderbox_builds(starttime = 0, endtime = int(time.time())):
 
 # Abstract base class
 class Build():
+  # Downloads or builds and extracts the build to a temporary directory
   def prepare(self):
     raise Exception("Attempt to call method on abstract base class")
   def cleanup(self):
@@ -177,18 +178,25 @@ class Build():
     raise Exception("Attempt to call method on abstract base class")
   def get_buildtime(self):
     raise Exception("Attempt to call method on abstract base class")
+  # Requires prepare()'d
   def get_binary(self):
     raise Exception("Attempt to call method on abstract base class")
 
 # Abstract class with shared helpers for TinderboxBuild/NightlyBuild
 class FTPBuild(Build):
   def prepare(self):
-    if not self._fetch():
+    if not self._revision:
       return False
+
+    ftp = ftplib.FTP('ftp.mozilla.org')
+    ftp.login()
+
+    ftpfile = _ftp_get(ftp, self._filename)
+    ftp.close()
+    
     _stat("Extracting build")
-    self._extracted = _extract_build(self._file)
-    self._file.close()
-    self._file = None
+    self._extracted = _extract_build(ftpfile)
+    ftpfile.close()
     self._prepared = True
     return True
 
@@ -199,8 +207,6 @@ class FTPBuild(Build):
     return True
 
   def get_revision(self):
-    if not self._revision and not self._fetch(True):
-      return False
     return self._revision
 
   def get_binary(self):
@@ -210,8 +216,6 @@ class FTPBuild(Build):
     return os.path.join(self._extracted, "firefox", "firefox")
 
   def get_buildtime(self):
-    if not self._timestamp and not self._fetch(True):
-      return False;
     return self._timestamp
 
 # A build that needs to be compiled
@@ -224,13 +228,29 @@ class FTPBuild(Build):
 class CompileBuild(Build):
   def __init__(self, repo, mozconfig, objdir, pull=False, commit=None, log=None):
     self._repopath = repo
-    self._checkout = commit
     self._commit = None
     self._mozconfig = mozconfig
     self._pull = pull
     self._objdir = objdir
     self._log = log
     self._logfile = None
+    self._checkout = True if commit else False
+    ##
+    ## Get info about commit
+    ##
+    import mercurial, mercurial.ui, mercurial.hg, mercurial.commands
+    hg_ui = mercurial.ui.ui()
+    repo = mercurial.hg.repository(hg_ui, self._repopath)
+    
+    _stat("Getting commit info")
+    commitname = commit if commit else "."
+    hg_ui.pushbuffer()
+    mercurial.commands.log(hg_ui, repo, rev=[commitname], template="{node} {date}", date="", user=None, follow=None)
+    commitinfo = hg_ui.popbuffer().split()
+    self._commit = commitinfo[0]
+    # If not set, seed testname/time with defaults from this commit
+    self._committime = commitinfo[1].split('.')[0] # {date} produces a timestamp of format '123234234.0-3600'
+    _stat("Commit is %s @ %s" % (self._commit, self._committime))
     
   def prepare(self):
     ##
@@ -260,25 +280,12 @@ class CompileBuild(Build):
         self._logfile.write(result)
 
     ##
-    ## Get info about commit
-    ##
-    _stat("Getting commit info")
-    commitname = self._checkout if self._checkout else "."
-    hg_ui.pushbuffer()
-    mercurial.commands.log(hg_ui, repo, rev=[commitname], template="{node} {date}", date="", user=None, follow=None)
-    commitinfo = hg_ui.popbuffer().split()
-    self._commit = commitinfo[0]
-    # If not set, seed testname/time with defaults from this commit
-    self._committime = commitinfo[1].split('.')[0] # {date} produces a timestamp of format '123234234.0-3600'
-    _stat("Commit is %s @ %s" % (self._commit, self._committime))
-
-    ##
     ## Checkout if needed
     ##
     if self._checkout:
       _stat("Performing checkout")
       hg_ui.pushbuffer()
-      mercurial.commands.update(hg_ui, repo, node=self._checkout, check=True)
+      mercurial.commands.update(hg_ui, repo, node=self._commit, check=True)
       result = hg_ui.popbuffer()
       if self._logfile:
         self._logfile.write(result)
@@ -333,8 +340,6 @@ class CompileBuild(Build):
     return True;
 
   def get_buildtime(self):
-    if not self._prepared:
-      raise Exception("CompileBuild is not prepared")
     return self._committime
 
   def get_binary(self):
@@ -353,9 +358,6 @@ class NightlyBuild(FTPBuild):
     self._date = date
     self._timestamp = None
     self._revision = None
-
-  # Get this build from ftp.m.o
-  def _fetch(self, noDL=False):
     month = self._date.month
     day = self._date.day
     year = self._date.year
@@ -378,7 +380,7 @@ class NightlyBuild(FTPBuild):
     rawlist = ftp.retrlines('NLST', findnightlydir)
 
     if not len(nightlydirs):
-      return False;
+      return;
 
     _stat("Nightly directories are: %s" % ', '.join(nightlydirs))
 
@@ -386,17 +388,15 @@ class NightlyBuild(FTPBuild):
       ret = _ftp_check_build_dir(ftp, x)
       if ret:
         (timestamp, revision, filename) = ret
+        self._filename = "%s/%s/%s" % (nightlydir, x, filename)
         break
 
     if not revision:
       return;
 
-    if not noDL:
-      self._file = _ftp_get(ftp, filename)
     ftp.close()
     self._timestamp = timestamp
     self._revision = revision
-    return True
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(FTPBuild):
@@ -405,17 +405,16 @@ class TinderboxBuild(FTPBuild):
     self._prepared = False
     self._revision = None
 
-  def _fetch(self, noDL=False):
+    basedir = "/pub/firefox/tinderbox-builds/mozilla-central-linux64"
     ftp = ftplib.FTP('ftp.mozilla.org')
     ftp.login()
-    ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/mozilla-central-linux64/')
+    ftp.voidcmd('CWD %s' % (basedir,))
     ret = _ftp_check_build_dir(ftp, self._timestamp)
     if not ret:
       _stat("WARN: Tinderbox build %s was not found" % (self._timestamp,))
-      return False
+      return
     (timestamp, self._revision, filename) = ret
 
-    if not noDL:
-      self._file = _ftp_get(ftp, filename)
+    self._filename = "%s/%s" % (basedir, filename)
     ftp.close()
     return True
