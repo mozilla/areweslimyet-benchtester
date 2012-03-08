@@ -427,5 +427,5 @@ class TinderboxBuild(FTPBuild):
       return
     (timestamp, self._revision, filename) = ret
 
-    self._filename = "%s/%s" % (basedir, filename)
+    self._filename = "%s/%s/%s" % (basedir, timestamp, filename)
     ftp.close()
