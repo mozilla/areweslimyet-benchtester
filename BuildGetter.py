@@ -417,4 +417,3 @@ class TinderboxBuild(FTPBuild):
 
     self._filename = "%s/%s" % (basedir, filename)
     ftp.close()
-    return True
