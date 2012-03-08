@@ -183,7 +183,8 @@ class Build():
 # Abstract class with shared helpers for TinderboxBuild/NightlyBuild
 class FTPBuild(Build):
   def prepare(self):
-    self._fetch()
+    if not self._fetch():
+      return False
     _stat("Extracting build")
     self._extracted = _extract_build(self._file)
     self._file.close()
@@ -200,8 +201,8 @@ class FTPBuild(Build):
     return True
 
   def get_revision(self):
-    if not self._revision:
-      self._fetch(True)
+    if not self._revision and not self._fetch(True):
+      return False
     return self._revision
 
   def get_binary(self):
@@ -211,8 +212,8 @@ class FTPBuild(Build):
     return os.path.join(self._extracted, "firefox", "firefox")
 
   def get_buildtime(self):
-    if not self._timestamp:
-      self._fetch(True)
+    if not self._timestamp and not self._fetch(True):
+      return False;
     return self._timestamp
 
 # A build that needs to be compiled
@@ -377,7 +378,7 @@ class NightlyBuild(FTPBuild):
     rawlist = ftp.retrlines('NLST', findnightlydir)
 
     if not len(nightlydirs):
-      raise Exception("Failed to find any nightly directory for date %s/%s/%s" % (month, day, year))
+      return False;
 
     _stat("Nightly directories are: %s" % ', '.join(nightlydirs))
 
@@ -388,13 +389,14 @@ class NightlyBuild(FTPBuild):
         break
 
     if not revision:
-      raise Exception("Couldn't find any directory with info on this build :(")
+      return;
 
     if not noDL:
       self._file = _ftp_get(ftp, filename)
     ftp.close()
     self._timestamp = timestamp
     self._revision = revision
+    return True
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(FTPBuild):
@@ -408,7 +410,8 @@ class TinderboxBuild(FTPBuild):
     ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/mozilla-central-linux64/')
     (self._timestamp, self._revision, filename) = _ftp_check_build_dir(ftp, self._timestamp)
     if not self._timestamp:
-      raise Exception("Tinderbox build %s not found on ftp.m.o" % timestamp)
+      return False
 
     self._file = _ftp_get(ftp, filename)
     ftp.close()
+    return True
