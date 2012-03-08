@@ -71,6 +71,18 @@ def _extract_build(fileobject):
 ## Working with ftp.m.o
 ##
 
+ftp = None
+def ftp_open():
+  global ftp
+  try:
+    ftp.voidcmd('CWD /')
+  except:
+    if ftp: ftp.close()
+    ftp = ftplib.FTP('ftp.mozilla.org')
+    ftp.login()
+
+  return ftp
+
 # Reads a file, returns the blob
 def _ftp_get(ftp, filename):
   # (We use readfile.filedat temporarily because of py2's lack of proper scoping
@@ -148,8 +160,7 @@ def get_hg_range(repodir, firstcommit, lastcommit, pullfirst=False):
 # Gets a list of TinderboxBuild objects for all builds on ftp.m.o within
 # specified date range
 def get_tinderbox_builds(starttime = 0, endtime = int(time.time())):
-  ftp = ftplib.FTP('ftp.mozilla.org')
-  ftp.login()
+  ftp = ftp_open()
   ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/mozilla-central-linux64/')
 
   def get(line):
@@ -192,8 +203,7 @@ class FTPBuild(Build):
     if not self._revision:
       return False
 
-    ftp = ftplib.FTP('ftp.mozilla.org')
-    ftp.login()
+    ftp = ftp_open()
 
     ftpfile = _ftp_get(ftp, self._filename)
     ftp.close()
@@ -368,8 +378,7 @@ class NightlyBuild(FTPBuild):
     _stat("Looking up nightly for %s/%s, %s" % (month, day, year))
 
     # Connect, CD to this month's dir
-    ftp = ftplib.FTP('ftp.mozilla.org')
-    ftp.login()
+    ftp = ftp_open()
     nightlydir = 'pub/firefox/nightly/%i/%02i' % (year, month)
     ftp.voidcmd('CWD %s' % nightlydir)
 
@@ -410,8 +419,7 @@ class TinderboxBuild(FTPBuild):
     self._revision = None
 
     basedir = "/pub/firefox/tinderbox-builds/mozilla-central-linux64"
-    ftp = ftplib.FTP('ftp.mozilla.org')
-    ftp.login()
+    ftp = ftp_open()
     ftp.voidcmd('CWD %s' % (basedir,))
     ret = _ftp_check_build_dir(ftp, self._timestamp)
     if not ret:
