@@ -409,10 +409,11 @@ class TinderboxBuild(FTPBuild):
     ftp = ftplib.FTP('ftp.mozilla.org')
     ftp.login()
     ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/mozilla-central-linux64/')
-    (timestamp, self._revision, filename) = _ftp_check_build_dir(ftp, self._timestamp)
-    if not timestamp:
+    ret = _ftp_check_build_dir(ftp, self._timestamp)
+    if not ret:
       _stat("WARN: Tinderbox build %s was not found" % (self._timestamp,))
       return False
+    (timestamp, self._revision, filename) = ret
 
     if not noDL:
       self._file = _ftp_get(ftp, filename)
