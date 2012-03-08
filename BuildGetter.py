@@ -189,8 +189,6 @@ class FTPBuild(Build):
     self._extracted = _extract_build(self._file)
     self._file.close()
     self._file = None
-    self._timestamp = None
-    self._revision = None
     self._prepared = True
     return True
 
@@ -353,6 +351,8 @@ class NightlyBuild(FTPBuild):
   def __init__(self, date):
     self._prepared = False
     self._date = date
+    self._timestamp = None
+    self._revision = None
 
   # Get this build from ftp.m.o
   def _fetch(self, noDL=False):
@@ -403,13 +403,15 @@ class TinderboxBuild(FTPBuild):
   def __init__(self, timestamp):
     self._timestamp = int(timestamp)
     self._prepared = False
+    self._revision = None
 
   def _fetch(self, noDL=False):
     ftp = ftplib.FTP('ftp.mozilla.org')
     ftp.login()
     ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/mozilla-central-linux64/')
-    (self._timestamp, self._revision, filename) = _ftp_check_build_dir(ftp, self._timestamp)
-    if not self._timestamp:
+    (timestamp, self._revision, filename) = _ftp_check_build_dir(ftp, self._timestamp)
+    if not timestamp:
+      _stat("WARN: Tinderbox build %s was not found" % (self._timestamp,))
       return False
 
     if not noDL:
