@@ -109,7 +109,11 @@ def _ftp_check_build_dir(ftp, dirname):
     if line.startswith('firefox') and line.endswith('linux-x86_64.txt'):
       infofile = line
 
-  ftp.voidcmd('CWD %s' % dirname)
+  try:
+    ftp.voidcmd('CWD %s' % dirname)
+  except:
+    return False
+
   ftp.retrlines('NLST', findinfofile)
   if not infofile:
     ftp.voidcmd('CwD ..')
