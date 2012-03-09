@@ -100,7 +100,8 @@ class BenchTester():
       return self.error("run_test() called before setup")
 
     # make sure a record is created, even if no testdata is produced
-    self._open_db()
+    if not self._open_db():
+      return self.error("Failed to open sqlite database")
     
     if self.modules.has_key(testtype):
       self.info("Passing test '%s' to module '%s'" % (testname, testtype))
@@ -126,7 +127,8 @@ class BenchTester():
     
   def add_test_results(self, testname, datapoints, succeeded=True):
     # Ensure DB is open
-    self._open_db()
+    if not self._open_db():
+      return self.error("Failed to open sqlite database")
     
     if not testname or not len(datapoints):
       return self.error("Invalid use of addDataPoint()")
