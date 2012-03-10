@@ -408,7 +408,7 @@ class NightlyBuild(FTPBuild):
         self._filename = "%s/%s/%s" % (nightlydir, x, filename)
         break
 
-    if not revision:
+    if not ret:
       return;
 
     ftp.close()
