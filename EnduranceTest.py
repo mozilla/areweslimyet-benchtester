@@ -77,6 +77,14 @@ class EnduranceTest(BenchTester.BenchTest):
                                        preferences={'startup.homepage_welcome_url' : '',
                                                     'startup.homepage_override_url' :''})
     runner = mozrunner.FirefoxRunner(binary=self.tester.binary, profile=profile)
+    # HACK to work around mozrunner's broken stop() method, which nukes all pids
+    # matching 'firefox' >= the child pid. This fixes concurrent tests.
+    def stoprunner(self):
+      if not self.process_handler:
+        return
+      self.process_handler.kill()
+      self.process_handler.wait(timeout=10)
+    runner.stop = stoprunner
     runner.cmdargs += ['-jsbridge', str(self.jsport)]
     
     # Add test
