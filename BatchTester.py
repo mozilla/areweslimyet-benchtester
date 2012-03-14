@@ -490,7 +490,8 @@ class BatchTest(object):
         else:
           build.note = "Failed to lookup full revision"
       elif hook and not hook.should_test(build, globalargs):
-        build.note = "Build skipped by tester (likely already tested)";
+        if not build.note:
+          build.note = "Build skipped by tester (likely already tested)";
       else:
         readybuilds.append(build)
         continue
