@@ -25,7 +25,7 @@ import subprocess
 
 output = sys.stdout
 
-socket.setdefaulttimeout(30)
+# socket.setdefaulttimeout(30)
 
 # TODO
 # This currently selects the linux-64 (non-pgo) build
