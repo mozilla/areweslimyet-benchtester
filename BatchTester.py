@@ -222,7 +222,7 @@ class BatchTest(object):
   # This happens asyncrhonously, so not all builds may be queued immediately
   def add_batch(self, batchargs):
     print(batchargs)
-    self.pendingbatches.append({ 'args' : batchargs, 'note' : None })
+    self.pendingbatches.append({ 'args' : batchargs, 'note' : None, 'requested' : time.time() })
 
   # Checks on the builder subprocess, getting its result, starting it if needed,
   # etc
@@ -265,6 +265,7 @@ class BatchTest(object):
       self.builder_mode = 'batch'
       self.builder_batch = self.pendingbatches.pop()
       self.stat("Handling batch %s" % (self.builder_batch,))
+      self.builder_batch['processed'] = time.time()
       self.processedbatches.append(self.builder_batch)
       self.builder_batch['note'] = "Processing - Looking up builds"
       self.builder = multiprocessing.Process(target=self._process_batch, args=(self.args, self.builder_batch['args'], self.builder_result, self.hook))
