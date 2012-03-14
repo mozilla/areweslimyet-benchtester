@@ -18,6 +18,7 @@ import shlex
 import platform
 import sqlite3
 import json
+import pickle
 
 import BuildGetter
 
@@ -43,14 +44,35 @@ def get_queued_job(dirname):
   batchfiles = os.listdir(dirname)
   if len(batchfiles):
     bname = os.path.join(dirname, sorted(batchfiles)[0])
-    bfile = open(bname, 'r')
-    bcmd = bfile.read()
-    bfile.close()
-    os.remove(bname)
+    try:
+      bfile = open(bname, 'r')
+      bcmd = json.load(bfile)
+    finally:
+      if bfile: bfile.close()
+      os.remove(bname)
     return bcmd
   return False
 
-# Wrapper for BuildGetter.Build objects
+# Given a 'hook', which is a path to a python file,
+# imports it as a module and returns the handle. A bit hacky.
+def _get_hook(filename):
+  hookname = os.path.basename(filename)
+  # Strip .py and complain if it has other periods. (I said hacky!)
+  if hookname[-3:].lower() == '.py':
+    hookname = hookname[:-3]
+  if hookname.find('.') != -1:
+    raise Exception("Hook filename cannot contain periods (other than .py (it is imported as a module interally))")
+
+  # Add dir containing hook to path temporarily
+  sys.path.append(os.path.abspath(os.path.dirname(filename)))
+  try:
+    ret = __import__(hookname)
+  finally:
+    sys.path = sys.path[:-1]
+  return ret
+
+# BatchBuild wraps BuildGetter.build with various info, and provides
+# a .(de)serialize for the status.json file output
 class BatchBuild():
   def __init__(self, build, revision):
     self.build = build
@@ -61,6 +83,7 @@ class BatchBuild():
     self.started = None
     self.finished = None
 
+  @staticmethod
   def deserialize(buildobj, args):
     if buildobj['type'] == 'compile':
       build = BuildGetter.CompileBuild(args.get('repo'), args.get('mozconfig'), args.get('objdir'), pull=True, commit=buildobj['revision'], log=None)
@@ -99,6 +122,23 @@ class BatchBuild():
     else:
       raise Exception("Unknown build type %s" % (build,))
     return ret
+
+# Work around multiprocessing.Pool() quirkiness. We can't give it
+# BatchTest.test_build directly because that might not point to the same thing
+# in the child process (members are mutable). we also can't give it build
+# directly because the pool pickles it at a later date and causes thread issues
+# (but just forcing it to pickle explicitly is fine as it would be pickled 
+# eventually either way)
+def _pool_batchtest_build(build, args):
+  return BatchTest.test_build(pickle.loads(build), args)
+
+##
+## BatchTest - a threaded test object. Given a list of builds, prepares them
+##             and tests them in parallel. In 'batch' mode, processes sets of
+##             arguments from a batch folder, and adds them to its queue, never
+##             exiting. (daemon mode might be better?)
+##             See BatchTestCLI for documentation on options
+##
 
 class BatchTest(object):
   def __init__(self, args, out=sys.stdout):
@@ -157,12 +197,13 @@ class BatchTest(object):
     if not statfile: return
     status = {
               'starttime' : self.starttime,
-              'building': self.builds['building'].serialize(),
+              'building': self.builds['building'].serialize() if self.builds['building'] else None,
               'batches' : self.processedbatches,
               'pendingbatches' : self.pendingbatches
             }
     for x in self.builds:
-      status[x] = filter(lambda y: y.serialize(), self.builds[x])
+      if type(self.builds[x]) == list:
+        status[x] = map(lambda y: y.serialize(), self.builds[x])
 
     tempfile = os.path.join(os.path.dirname(statfile), ".%s" % os.path.basename(statfile))
     sf = open(tempfile, 'w')
@@ -181,6 +222,7 @@ class BatchTest(object):
   # Given a set of arguments, lookup & add all specified builds to our queue.
   # This happens asyncrhonously, so not all builds may be queued immediately
   def add_batch(self, batchargs):
+    print(batchargs)
     self.pendingbatches.append({ 'args' : batchargs, 'note' : None })
 
   # Checks on the builder subprocess, getting its result, starting it if needed,
@@ -199,19 +241,19 @@ class BatchTest(object):
           else:
             self.builds['pending'].extend(self.builder_result['ret'][0])
           self.builds['skipped'].extend(self.builder_result['ret'][1])
+          self.builder_batch['note'] = "Queued %u builds, skipped %u" % (len(self.builder_result['ret'][0]),len(self.builder_result['ret'][1]))
         else:
           self.builder_batch['note'] = "Failed: %s" % (self.builder_result['ret'],)
         self.stat("Batch completed: %s (%s)" % (self.builder_batch['args'], self.builder_batch['note']))
-        self.processedbatches.append(self.builder_batch)
         self.builder_batch = None
 
       # Finished a build job
       elif self.builder_mode == 'build':
         build = self.builds['building']
-        self.stat("Build %u completed" % (build.num,))
+        self.stat("Test %u prepared" % (build.num,))
         self.builds['building'] = None
         if self.builder_result['result'] == 'success':
-          self.builds['prepared'].append(build)
+          self.builds['prepared'].append(self.builder_result['ret'])
         else:
           build.note = "Failed: %s" % (self.builder_result['ret'],)
           self.builds['failed'] = build
@@ -224,6 +266,8 @@ class BatchTest(object):
       self.builder_mode = 'batch'
       self.builder_batch = self.pendingbatches.pop()
       self.stat("Handling batch %s" % (self.builder_batch,))
+      self.processedbatches.append(self.builder_batch)
+      self.builder_batch['note'] = "Processing - Looking up builds"
       self.builder = multiprocessing.Process(target=self._process_batch, args=(self.args, self.builder_batch['args'], self.builder_result, self.hook))
       self.builder.start()
     elif not self.builder and self.builds['building']:
@@ -239,7 +283,7 @@ class BatchTest(object):
     else:
       result['result'] = 'failed'
 
-    result['ret'] = None
+    result['ret'] = build
     
   #
   # Run loop
@@ -259,12 +303,16 @@ class BatchTest(object):
 
     batchmode = self.args.get('batch')
     if batchmode:
-      if statfile and os.path.exists(statfile) and args.get('status_resume'):
+      if statfile and os.path.exists(statfile) and self.args.get('status_resume'):
         sf = open(statfile, 'r')
         ostat = json.load(sf)
         sf.close()
-        for x in ostat['running'] + ostat['prepared'] + ostat['building'] + ostat['pending']:
-          self.pending.append(BatchBuild.deserialize(x))
+        # Try to recover builds in order they were going to be processed
+        recover_builds = ostat['running']
+        recover_builds.extend(ostat['prepared'])
+        if ostat['building']: recover_builds.append(ostat['building'])
+        recover_builds.extend(ostat['pending'])
+        self.builds['pending'].extend(map(lambda x: BatchBuild.deserialize(x, self.args), recover_builds))
     else:
       self.add_batch(self.args)
 
@@ -275,38 +323,39 @@ class BatchTest(object):
         
         taskresult = build.task.get() if build.task.successful() else False
         if taskresult is True:
-          self.stat("Build %u finished" % (build.num,))
+          self.stat("Test %u finished" % (build.num,))
           self.builds['completed'].append(build)
         else:
-          self.stat("!! Build %u failed" % (task.num,))
+          self.stat("!! Test %u failed :: %s" % (build.num, taskresult))
           build.note = "Task returned error %s" % (taskresult,)
           self.builds['failed'].append(build)
         build.finished = time.time()
         self.builds['running'].remove(build)
-        build.cleanup()
+        build.build.cleanup()
 
       # Check on builder
       self.check_builder()
 
       # Read any pending jobs if we're in batchmode
       while batchmode:
-        bcmd = None
-        rcmd = get_queued_job(batchmode)
-        if not rcmd: break
+        rcmd = None
         try:
-          bcmd = vars(parser.parse_args(shlex.split(rcmd)))
-        except SystemExit, e: # Don't let argparser actually exit on fail
-          note = "Failed to parse batch file command: \"%s\"" % (rcmd,)
+          rcmd = get_queued_job(batchmode)
+        except Exception, e:
+          note = "Invalid batch file"
           self.stat(note)
-          self.processedbatches.append({ 'args' : rcmd, 'note': note })
-        if bcmd:
-          add_batch(bcmd)
+          self.processedbatches.append({ 'args' : "<parse error>", 'note': note })
+        if rcmd:
+          self.add_batch(rcmd)
+        else:
+          break
 
-      # Prepare pending builds, but not more than max * 2, as prepared builds
+      # Prepare pending builds, but not more than processes, as prepared builds
       # takeup space (hundreds of queued builds would fill /tmp with gigabytes
       # of things)
-      in_progress = len(self.builds['prepared']) + len(self.builds['pending']) + len(self.builds['running'])
-      if len(self.builds['pending']) and not self.builds['building'] and in_progress < self.args['processes'] * 2:
+      if len(self.builds['pending']) \
+          and not self.builds['building'] \
+          and len(self.builds['prepared']) < self.args['processes']:
         build = self.builds['pending'][0]
         self.builds['building'] = build
         self.builds['pending'].remove(build)
@@ -318,14 +367,13 @@ class BatchTest(object):
         build = self.builds['prepared'][0]
         self.builds['prepared'].remove(build)
         build.started = time.time()
-        self.stat("Moving build %u to running" % (build.num,))
-        for x in vars(build):
-          print("%s: %s" % (x, getattr(build, x)))
-        build.task = self.pool.apply_async(self.test_build, [build, self.args])
+        self.stat("Moving test %u to running" % (build.num,))
+        build.task = self.pool.apply_async(_pool_batchtest_build, [pickle.dumps(build), self.args])
         self.builds['running'].append(build)
 
       self.write_status()
-      
+
+      in_progress = len(self.builds['pending']) + len(self.builds['prepared']) + len(self.builds['running'])
       if not self.builder and not self.builds['building'] and in_progress == 0:
         # out of things to do
         if not batchmode:
@@ -334,7 +382,7 @@ class BatchTest(object):
           if self.buildindex > 0:
             self.stat("All tasks complete. Resetting")
             # Reset buildnum when empty to keep it from getting too large
-            # (it affects vnc display # and such, which isn't infinite)
+            # (hooks use it for vnc display # and such, which isn't infinite)
             self.reset_pool()
             # Remove items older than 1 day from these lists
             self.builds['completed'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['completed'])
@@ -358,7 +406,7 @@ class BatchTest(object):
   def _process_batch(globalargs, batchargs, returnproxy, hook):
     try:
       if hook:
-        mod = __import__(globalargs.get('hook'))
+        mod = _get_hook(globalargs.get('hook'))
       else:
         mod = None
       ret = BatchTest._process_batch_inner(globalargs, batchargs, mod)
@@ -424,23 +472,28 @@ class BatchTest(object):
     readybuilds = []
     skippedbuilds = []
     for build in builds:
-      revision = build.get_revision()
-      if len(revision) < 40:
+      rev = build.get_revision()
+      fullrev = rev
+      if not fullrev or len(fullrev) < 40:
         # We want the full revision ID for database
-        revinfo = BuildGetter.get_hg_range(globalargs.get("repo"), revision, revision)
+        revinfo = BuildGetter.get_hg_range(globalargs.get("repo"), fullrev, fullrev)
         if revinfo and len(revinfo):
-          revision = revinfo[0]
+          fullrev = revinfo[0]
         else:
-          revision = None
+          fullrev = None
 
-      build = BatchBuild(build, revision)
-      if not revision:
-        build.note = "Failed to lookup full revision"
+      build = BatchBuild(build, fullrev)
+      if not fullrev:
+        if not rev:
+          # Can only happen with FTP builds we failed to lookup on ftp.m.o
+          build.note = "Build is incomplete on ftp.m.o"
+        else:
+          build.note = "Failed to lookup full revision"
       elif hook and not hook.should_test(build, globalargs):
         build.note = "Build skipped by tester (likely already tested)";
       else:
         readybuilds.append(build)
-        break
+        continue
 
       build.finished = time.time()
       skippedbuilds.append(build)
@@ -451,20 +504,20 @@ class BatchTest(object):
   # Build testing pool
   #
   @staticmethod
-  def test_build(build, globalargs, hook=None):
+  def test_build(build, globalargs):
     mod = None
-    if not hook:
+    if not globalargs.get('hook'):
       return "Cannot test builds without a --hook providing run_tests(Build)"
 
     try:
-      mod = __import__(hook)
+      mod = _get_hook(globalargs.get('hook'))
       # TODO BenchTester should actually dynamically pick a free port, rather than
       # taking it as a parameter.
       s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
       try:
-        s.bind(('', 24242 + buildindex))
+        s.bind(('', 24242 + build.num))
       except Exception, e:
-        raise Exception("Test error: jsbridge port %u unavailable" % (24242 + buildindex,))
+        raise Exception("Test error: jsbridge port %u unavailable" % (24242 + build.num,))
       s.close()
 
       mod.run_tests(build, globalargs)
@@ -492,8 +545,7 @@ class BatchTestCLI(BatchTest):
     self.parser.add_argument('--prioritize', action='store_true', help="For batch'd builds, insert at the beginning of the pending queue rather than the end")
     temp = vars(self.parser.parse_known_args(args)[0])
     if temp.get('hook'):
-      sys.path.append(os.path.abspath(os.path.dirname(temp.get('hook'))))
-      mod = __import__(os.path.basename(temp.get('hook')))
+      mod = _get_hook(temp.get('hook'))
       mod.cli_hook(self.parser)
 
     args = vars(self.parser.parse_args(args))
