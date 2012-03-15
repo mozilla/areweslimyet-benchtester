@@ -431,7 +431,7 @@ class BatchTest(object):
       BuildGetter.get_hg_range(globalargs.get('repo'), '.', '.', True)
 
     mode = batchargs['mode']
-    dorange = batchargs['lastbuild']
+    dorange = 'lastbuild' in batchargs and batchargs['lastbuild']
     builds = []
     # Queue builds
     if mode == 'nightly':
