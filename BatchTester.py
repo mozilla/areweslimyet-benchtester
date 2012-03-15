@@ -225,8 +225,8 @@ class BatchTest(object):
   # Given a set of arguments, lookup & add all specified builds to our queue.
   # This happens asyncrhonously, so not all builds may be queued immediately
   def add_batch(self, batchargs):
-    print(batchargs)
-    self.pendingbatches.append({ 'args' : batchargs, 'note' : None, 'requested' : time.time() })
+    self.pendingbatches.append({ 'args' : batchargs, 'note' : None, 'requested' : time.time(), 'uid': self.processed })
+    self.processed += 1
 
   # Checks on the builder subprocess, getting its result, starting it if needed,
   # etc
