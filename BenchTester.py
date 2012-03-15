@@ -135,8 +135,8 @@ class BenchTester():
     
     timestamp = time.time()
     
-    for datapoint, val in datapoints.iteritems():
-      self.info("Datapoint: Test '%s', Datapoint '%s', Value '%s'" % (testname, datapoint, val))
+    #for datapoint, val in datapoints.iteritems():
+    #  self.info("Datapoint: Test '%s', Datapoint '%s', Value '%s'" % (testname, datapoint, val))
     if self.sqlite:
       try:
         cur = self.sqlite.cursor()
