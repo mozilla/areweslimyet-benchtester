@@ -80,6 +80,7 @@ class BatchBuild():
     self.task = None
     self.note = None
     self.started = None
+    self.uid = -1
     self.finished = None
 
   @staticmethod
@@ -94,6 +95,7 @@ class BatchBuild():
       raise Exception("Unkown build type %s" % buildobj['type'])
 
     ret = BatchBuild(build, buildobj['revision'])
+    ret.uid = buildobj['uid']
     ret.timestamp = buildobj['timestamp']
     ret.note = buildobj['note']
     ret.started = buildobj['started']
@@ -107,7 +109,8 @@ class BatchBuild():
       'revision' : self.revision,
       'note' : self.note,
       'started' : self.started,
-      'finished' : self.finished
+      'finished' : self.finished,
+      'uid' : self.uid
     }
 
     if isinstance(self.build, BuildGetter.CompileBuild):
