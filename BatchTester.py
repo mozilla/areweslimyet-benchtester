@@ -148,6 +148,7 @@ class BatchTest(object):
     self.starttime = time.time()
     self.buildindex = 0
     self.pool = None
+    self.processed = 0
     self.builds = {
       'building' : None,
       'prepared': [],
@@ -186,7 +187,7 @@ class BatchTest(object):
     if self.pool:
       self.pool.close()
       self.pool.join()
-    self.buildnum = 0
+    self.buildindex = 0
     self.pool = multiprocessing.Pool(processes=self.args['processes'], maxtasksperchild=1)
 
   #
@@ -235,10 +236,7 @@ class BatchTest(object):
       # Finished a batch queue job
       if self.builder_mode == 'batch':
         if self.builder_result['result'] == 'success':
-          if self.builder_batch['args'].get('prioritize'):
-            self.builds['pending'] = self.builder_result['ret'][0] + self.builds['pending']
-          else:
-            self.builds['pending'].extend(self.builder_result['ret'][0])
+          self.queue_builds(self.builder_result['ret'][0], self.builder_batch['args'].get('prioritize'))
           self.builds['skipped'].extend(self.builder_result['ret'][1])
           self.builder_batch['note'] = "Queued %u builds, skipped %u" % (len(self.builder_result['ret'][0]),len(self.builder_result['ret'][1]))
         else:
@@ -284,7 +282,17 @@ class BatchTest(object):
       result['result'] = 'failed'
 
     result['ret'] = build
-    
+
+  # Add builds to self.builds['pending'], giving them a uid
+  def queue_builds(self, builds, prepend=False):
+    for x in builds:
+      x.uid = self.processed
+      self.processed += 1
+    if (prepend):
+      self.builds['pending'] = builds + self.builds['pending']
+    else:
+      self.builds['pending'].extend(builds)
+
   #
   # Run loop
   #
@@ -312,7 +320,7 @@ class BatchTest(object):
         recover_builds.extend(ostat['prepared'])
         if ostat['building']: recover_builds.append(ostat['building'])
         recover_builds.extend(ostat['pending'])
-        self.builds['pending'].extend(map(lambda x: BatchBuild.deserialize(x, self.args), recover_builds))
+        self.queue_builds(map(lambda x: BatchBuild.deserialize(x, self.args), recover_builds))
     else:
       self.add_batch(self.args)
 
@@ -381,7 +389,7 @@ class BatchTest(object):
         else:
           if self.buildindex > 0:
             self.stat("All tasks complete. Resetting")
-            # Reset buildnum when empty to keep it from getting too large
+            # Reset buildindex when empty to keep it from getting too large
             # (hooks use it for vnc display # and such, which isn't infinite)
             self.reset_pool()
             # Remove items older than 1 day from these lists
