@@ -239,8 +239,8 @@ class BatchTest(object):
       # Finished a batch queue job
       if self.builder_mode == 'batch':
         if self.builder_result['result'] == 'success':
-          self.queue_builds(self.builder_result['ret'][0], self.builder_batch['args'].get('prioritize'))
-          self.builds['skipped'].extend(self.builder_result['ret'][1])
+          self.queue_builds(self.builder_result['ret'][0], prepend=self.builder_batch['args'].get('prioritize'))
+          self.queue_builds(self.builder_result['ret'][1], target='skipped', prepend=self.builder_batch['args'].get('prioritize'))
           self.builder_batch['note'] = "Queued %u builds, skipped %u" % (len(self.builder_result['ret'][0]),len(self.builder_result['ret'][1]))
         else:
           self.builder_batch['note'] = "Failed: %s" % (self.builder_result['ret'],)
@@ -286,15 +286,15 @@ class BatchTest(object):
 
     result['ret'] = build
 
-  # Add builds to self.builds['pending'], giving them a uid
-  def queue_builds(self, builds, prepend=False):
+  # Add builds to self.builds[target], giving them a uid
+  def queue_builds(self, builds, target='pending', prepend=False):
     for x in builds:
       x.uid = self.processed
       self.processed += 1
     if (prepend):
-      self.builds['pending'] = builds + self.builds['pending']
+      self.builds[target] = builds + self.builds[target]
     else:
-      self.builds['pending'].extend(builds)
+      self.builds[target].extend(builds)
 
   #
   # Run loop
