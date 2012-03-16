@@ -351,7 +351,7 @@ class BatchTest(object):
           self.builds['completed'].append(build)
         else:
           self.stat("!! Test %u failed :: %s" % (build.num, taskresult))
-          build.note = "Task returned error %s" % (taskresult,)
+          build.note = "Failed: %s" % (taskresult,)
           self.builds['failed'].append(build)
         build.finished = time.time()
         self.builds['running'].remove(build)
