@@ -531,6 +531,7 @@ class BatchTest(object):
   @staticmethod
   def test_build(build, globalargs):
     mod = None
+    ret = True
     if not globalargs.get('hook'):
       return "Cannot test builds without a --hook providing run_tests(Build)"
 
