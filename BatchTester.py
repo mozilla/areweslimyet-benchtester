@@ -240,9 +240,10 @@ class BatchTest(object):
       # Finished a batch queue job
       if self.builder_mode == 'batch':
         if self.builder_result['result'] == 'success':
-          self.queue_builds(self.builder_result['ret'][0], prepend=self.builder_batch['args'].get('prioritize'))
+          queued = self.queue_builds(self.builder_result['ret'][0], prepend=self.builder_batch['args'].get('prioritize'))
+          already_queued = len(self.builder_result['ret'][0]) - len(queued)
           self.queue_builds(self.builder_result['ret'][1], target='skipped', prepend=self.builder_batch['args'].get('prioritize'))
-          self.builder_batch['note'] = "Queued %u builds, skipped %u" % (len(self.builder_result['ret'][0]),len(self.builder_result['ret'][1]))
+          self.builder_batch['note'] = "Queued %u builds, skipped %u" % (len(queued), already_queued + len(self.builder_result['ret'][1]))
         else:
           self.builder_batch['note'] = "Failed: %s" % (self.builder_result['ret'],)
         self.stat("Batch completed: %s (%s)" % (self.builder_batch['args'], self.builder_batch['note']))
@@ -306,6 +307,7 @@ class BatchTest(object):
       self.builds[target] = ready + self.builds[target]
     else:
       self.builds[target].extend(ready)
+    return ready
 
   #
   # Run loop
