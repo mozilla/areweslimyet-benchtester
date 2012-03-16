@@ -417,7 +417,7 @@ class BatchTest(object):
         if self.tick % 120 == 0:
           # Remove items older than 1 day from these lists
           self.builds['completed'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['completed'])
-          self.builds['failed'] = filter(lambda x: (x.finished + 60 * 60 * 24 * 5) > time.time(), self.builds['failed'])
+          self.builds['failed'] = filter(lambda x: (x.finished + 60 * 60 * 24 * 3) > time.time(), self.builds['failed'])
           self.builds['skipped'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['skipped'])
           batches = filter(lambda x: (x.processed + 60 * 60 * 24) > time.time(), batches)
         time.sleep(1)
