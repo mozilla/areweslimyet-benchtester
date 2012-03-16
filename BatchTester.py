@@ -81,6 +81,7 @@ class BatchBuild():
     self.note = None
     self.started = None
     self.uid = -1
+    self.tick = 0
     self.finished = None
 
   @staticmethod
@@ -408,15 +409,17 @@ class BatchTest(object):
             # Reset buildindex when empty to keep it from getting too large
             # (hooks use it for vnc display # and such, which isn't infinite)
             self.reset_pool()
-            # Remove items older than 1 day from these lists
-            self.builds['completed'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['completed'])
-            self.builds['failed'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['failed'])
-            self.builds['skipped'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['skipped'])
-            batches = filter(lambda x: (x.processed + 60 * 60 * 24) > time.time(), batches)
           else:
             time.sleep(1)
       else:
         # Wait a little and repeat loop
+        self.tick += 1
+        if self.tick % 120 == 0:
+          # Remove items older than 1 day from these lists
+          self.builds['completed'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['completed'])
+          self.builds['failed'] = filter(lambda x: (x.finished + 60 * 60 * 24 * 5) > time.time(), self.builds['failed'])
+          self.builds['skipped'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['skipped'])
+          batches = filter(lambda x: (x.processed + 60 * 60 * 24) > time.time(), batches)
         time.sleep(1)
 
     self.stat("No more tasks, exiting")
