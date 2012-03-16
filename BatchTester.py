@@ -343,12 +343,12 @@ class BatchTest(object):
           # this all happens before the helper thread starts so there are no other
           # batches to contend with
           self.add_batch("< Tester Restarted : Resuming interrupted builds >")
+          resumebatch = self.pendingbatches.pop()
+          self.processedbatches.append(resumebatch)
+          resumebatch['processed'] = time.time()
           self.write_status()
           self.queue_builds(map(lambda x: BatchBuild.deserialize(x, self.args), recover_builds))
-
-          batch = self.pendingbatches.pop()
-          batch['note'] = "Recovered %u builds (%u skipped)" % (len(self.builds['pending']), len(self.builds['skipped']))
-          self.processedbatches.append(batch)
+          resumebatch['note'] = "Recovered %u builds (%u skipped)" % (len(self.builds['pending']), len(self.builds['skipped']))
     else:
       self.add_batch(self.args)
 
