@@ -90,11 +90,14 @@ def _ftp_get(ftp, filename):
   #  for nested functions)
   def readfile(line):
       readfile.filedat.write(line)
-  readfile.filedat = cStringIO.StringIO()
-
-  ftp.retrbinary('RETR %s' % filename, readfile)
 
   # Python2 didn't have any design flaws. None, I say!
+  readfile.filedat = cStringIO.StringIO()
+
+  try:
+    ftp.retrbinary('RETR %s' % filename, readfile)
+  except:
+    return False
 
   readfile.filedat.seek(0)
   return readfile.filedat
@@ -125,6 +128,8 @@ def _ftp_check_build_dir(ftp, dirname):
   #
 
   fileio = _ftp_get(ftp, infofile)
+  if not fileio:
+    return False
   filedat = fileio.getvalue()
   fileio.close()
 
@@ -211,6 +216,9 @@ class FTPBuild(Build):
     ftp = ftp_open()
 
     ftpfile = _ftp_get(ftp, self._filename)
+    if not ftpfile:
+      _stat("Failed to download build from FTP")
+      return False
     
     _stat("Extracting build")
     self._extracted = _extract_build(ftpfile)
