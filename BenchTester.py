@@ -80,10 +80,12 @@ class BenchTester():
     self.log('info', msg)
     
   def error(self, msg):
+    self.errors.append(msg)
     self.log('error', msg)
     return False
     
   def warn(self, msg):
+    self.warnings.append(msg)
     self.log('warning', msg)
     
   def log(self, type, msg, timestamp = None, noprint = False):
@@ -170,6 +172,8 @@ class BenchTester():
     self.buildtime = None
     self.buildname = None
     self.sqlite = False
+    self.errors = []
+    self.warnings = []
     
     # These can be passed to setup() like so:
     #   mytester.setup({'binary': 'blah', 'buildname': 'blee'})
