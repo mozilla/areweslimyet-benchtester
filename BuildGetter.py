@@ -78,6 +78,7 @@ def ftp_open():
     ftp.voidcmd('CWD /')
   except:
     if ftp: ftp.close()
+    _stat("Opening new FTP connection")
     ftp = ftplib.FTP('ftp.mozilla.org')
     ftp.login()
 
