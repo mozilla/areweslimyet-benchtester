@@ -430,7 +430,7 @@ class BatchTest(object):
           self.builds['completed'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['completed'])
           self.builds['failed'] = filter(lambda x: (x.finished + 60 * 60 * 24 * 3) > time.time(), self.builds['failed'])
           self.builds['skipped'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['skipped'])
-          batches = filter(lambda x: (x.processed + 60 * 60 * 24) > time.time(), batches)
+          self.processedbatches = filter(lambda x: (x.processed + 60 * 60 * 24) > time.time(), self.processedbatches)
         time.sleep(1)
 
     self.stat("No more tasks, exiting")
