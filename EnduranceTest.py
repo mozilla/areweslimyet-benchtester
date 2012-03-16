@@ -142,5 +142,8 @@ class EnduranceTest(BenchTester.BenchTest):
     
     if not self.tester.add_test_results(testname, results, successful):
       return self.error("Failed to save test results")
+    if not successful:
+      fails = [y for x in mozmillinst.fails for y in x['fails']]
+      return self.error("%u failures occured during test run: %s" % (len(fails), fails))
     self.info("Test '%s' complete" % testname)
     return True
