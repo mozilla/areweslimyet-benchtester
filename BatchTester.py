@@ -245,7 +245,7 @@ class BatchTest(object):
           self.queue_builds(self.builder_result['ret'][1], target='skipped', prepend=self.builder_batch['args'].get('prioritize'))
           self.builder_batch['note'] = "Queued %u builds, skipped %u" % (len(queued), already_queued + len(self.builder_result['ret'][1]))
         else:
-          self.builder_batch['note'] = "Failed: %s" % (self.builder_result['ret'],)
+          self.builder_batch['note'] = self.builder_result['ret']
         self.stat("Batch completed: %s (%s)" % (self.builder_batch['args'], self.builder_batch['note']))
         self.builder_batch = None
 
@@ -548,7 +548,7 @@ class BatchTest(object):
 
       mod.run_tests(build, globalargs)
     except (Exception, KeyboardInterrupt) as e:
-      err = "Test worker encountered an exception:\n%s :: %s" % (type(e), e)
+      err = "%s :: %s" % (type(e), e)
       ret = err
     return ret
 
