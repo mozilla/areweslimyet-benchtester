@@ -217,7 +217,7 @@ class BatchTest(object):
     sf.close()
 
   # Builds that are in the pending/running list already
-  def build_is_queued(build):
+  def build_is_queued(self, build):
     for x in ( self.builds['running'], self.builds['pending'], self.builds['prepared'], [ self.builds['building'] ]):
       for y in x:
         if y and y.revision == build.revision:
@@ -293,7 +293,7 @@ class BatchTest(object):
     skip = []
     ready = []
     for x in builds:
-      if target == 'pending' and build_is_queued(x):
+      if target == 'pending' and self.build_is_queued(x):
         skip.append(x)
         x.note = "A build with this revision is already in queue"
       else:
