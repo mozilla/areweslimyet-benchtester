@@ -218,8 +218,9 @@ class BatchTest(object):
 
   # Builds that are in the pending/running list already
   def build_is_queued(build):
-    for x in self.running + self.pending:
-      if type(x.build) == type(build.build) and x.revision == build.revision:
+    for x in ( self.builds['running'], self.builds['pending'], self.builds['prepared'], [ self.builds['building'] ])
+      for y in x:
+        if y and y.revision == build.revision:
         return True
     return False
   # Given a set of arguments, lookup & add all specified builds to our queue.
@@ -286,15 +287,25 @@ class BatchTest(object):
 
     result['ret'] = build
 
-  # Add builds to self.builds[target], giving them a uid
+  # Add builds to self.builds[target], giving them a uid. Redirect builds from
+  # pending -> skipped if they're already queued
   def queue_builds(self, builds, target='pending', prepend=False):
+    skip = []
+    ready = []
     for x in builds:
+      if target == 'pending' and build_is_queued(x):
+        skip.append(x)
+        x.note = "A build with this revision is already in queue"
+      else:
+        ready.append(x)
       x.uid = self.processed
       self.processed += 1
+    if len(skip):
+      self.builds['skipped'].extend(skip)
     if (prepend):
-      self.builds[target] = builds + self.builds[target]
+      self.builds[target] = ready + self.builds[target]
     else:
-      self.builds[target].extend(builds)
+      self.builds[target].extend(ready)
 
   #
   # Run loop
