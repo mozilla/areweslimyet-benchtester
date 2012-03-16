@@ -115,7 +115,7 @@ class EnduranceTest(BenchTester.BenchTest):
     try:
       mozmillinst.stop()
     except Exception, e:
-      self.error("Failed to properly cleanup mozmill")
+      self.error("Failed to properly cleanup mozmill -- %s: %s" % (type(e), e))
     
     shutil.rmtree(profdir)
       
