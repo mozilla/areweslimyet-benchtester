@@ -218,10 +218,10 @@ class BatchTest(object):
 
   # Builds that are in the pending/running list already
   def build_is_queued(build):
-    for x in ( self.builds['running'], self.builds['pending'], self.builds['prepared'], [ self.builds['building'] ])
+    for x in ( self.builds['running'], self.builds['pending'], self.builds['prepared'], [ self.builds['building'] ]):
       for y in x:
         if y and y.revision == build.revision:
-        return True
+          return True
     return False
   # Given a set of arguments, lookup & add all specified builds to our queue.
   # This happens asyncrhonously, so not all builds may be queued immediately
