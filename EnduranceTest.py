@@ -17,7 +17,7 @@ import re
 class EnduranceTest(BenchTester.BenchTest):
   def __init__(self, parent):
     BenchTester.BenchTest.__init__(self, parent)
-    parent.add_argument('--jsbridge_port', help="Port to use for jsbridge, so concurrent tests don't collide")
+    parent.add_argument('--jsbridge_port', help="Port to use for jsbridge, so concurrent tests don't collide", default="24242")
     self.name = "EnduranceTest"
     self.parent = parent
   
