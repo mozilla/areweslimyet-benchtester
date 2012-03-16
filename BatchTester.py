@@ -81,7 +81,6 @@ class BatchBuild():
     self.note = None
     self.started = None
     self.uid = -1
-    self.tick = 0
     self.finished = None
 
   @staticmethod
@@ -153,6 +152,7 @@ class BatchTest(object):
     self.buildindex = 0
     self.pool = None
     self.processed = 0
+    self.tick = 0
     self.builds = {
       'building' : None,
       'prepared': [],
