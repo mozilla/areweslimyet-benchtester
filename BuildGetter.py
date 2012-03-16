@@ -210,7 +210,6 @@ class FTPBuild(Build):
     ftp = ftp_open()
 
     ftpfile = _ftp_get(ftp, self._filename)
-    ftp.close()
     
     _stat("Extracting build")
     self._extracted = _extract_build(ftpfile)
@@ -384,7 +383,11 @@ class NightlyBuild(FTPBuild):
     # Connect, CD to this month's dir
     ftp = ftp_open()
     nightlydir = 'pub/firefox/nightly/%i/%02i' % (year, month)
-    ftp.voidcmd('CWD %s' % nightlydir)
+    try:
+      ftp.voidcmd('CWD %s' % nightlydir)
+    except Exception, e:
+      _stat("Failed to enter the directory for this nightly")
+      return;
 
     # Find the appropriate YYYY-MM-DD-??-mozilla-central directory. There may be
     # multiple if the builds took over an hour
@@ -408,12 +411,9 @@ class NightlyBuild(FTPBuild):
         self._filename = "%s/%s/%s" % (nightlydir, x, filename)
         break
 
-    if not ret:
-      return;
-
-    ftp.close()
-    self._timestamp = timestamp
-    self._revision = revision
+    if ret:
+      self._timestamp = timestamp
+      self._revision = revision
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(FTPBuild):
@@ -432,4 +432,4 @@ class TinderboxBuild(FTPBuild):
     (timestamp, self._revision, filename) = ret
 
     self._filename = "%s/%s/%s" % (basedir, timestamp, filename)
-    ftp.close()
+
