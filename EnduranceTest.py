@@ -87,6 +87,10 @@ class EnduranceTest(BenchTester.BenchTest):
           return
         self.process_handler.kill()
         self.process_handler.wait(timeout=10)
+      def wait(self, timeout=None):
+        """Wait for the browser to exit."""
+        self.process_handler.wait(timeout=timeout)
+
     runner = runnerwrap(binary=self.tester.binary, profile=profile)
     runner.cmdargs += ['-jsbridge', str(self.jsport)]
     
