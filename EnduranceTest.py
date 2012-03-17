@@ -109,7 +109,7 @@ class EnduranceTest(BenchTester.BenchTest):
         mozmillinst.stop()
         shutil.rmtree(profdir)
       except: pass
-      return self.error("Endurance test run failed")
+      return self.error("Endurance test run failed -- %s: %s" % (type(e), e))
     
     self.info("Endurance - cleaning up")
     try:
