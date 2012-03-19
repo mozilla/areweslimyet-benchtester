@@ -79,8 +79,9 @@ class EnduranceTest(BenchTester.BenchTest):
                                        # and other things that can screw with benchmarks
                                        preferences={'startup.homepage_welcome_url' : '',
                                                     'startup.homepage_override_url' :''})
-    # HACK to work around mozrunner's broken stop() method, which nukes all pids
-    # matching 'firefox' >= the child pid. This fixes concurrent tests.
+    # HACK to work around mozrunner's broken stop/wait methods, which nuke all
+    # pids matching 'firefox' >= the child pid. This fixes concurrent tests.
+    # Bug735501 - fixed in mozmill 2.0+
     class runnerwrap(mozrunner.FirefoxRunner):
       def stop(self):
         if not self.process_handler:
