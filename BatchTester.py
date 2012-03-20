@@ -129,7 +129,7 @@ class BatchBuild():
 # BatchTest.test_build directly because that might not point to the same thing
 # in the child process (members are mutable). we also can't give it build
 # directly because the pool pickles it at a later date and causes thread issues
-# (but just forcing it to pickle explicitly is fine as it would be pickled 
+# (but just forcing it to pickle explicitly is fine as it would be pickled
 # eventually either way)
 def _pool_batchtest_build(build, args):
   return BatchTest.test_build(pickle.loads(build), args)
@@ -145,7 +145,7 @@ def _pool_batchtest_build(build, args):
 class BatchTest(object):
   def __init__(self, args, out=sys.stdout):
     # See BatchTestCLI for args documentation, for the time being
-    self.args = args    
+    self.args = args
     self.logfile = None
     self.out = out
     self.starttime = time.time()
@@ -170,7 +170,7 @@ class BatchTest(object):
       self.hook = os.path.basename(self.args.get('hook'))
     else:
       self.hook = None
-    
+
     self.builder = None
     self.builder_mode = None
     self.builder_batch = None
@@ -263,7 +263,7 @@ class BatchTest(object):
       self.builder_result['result'] = 'uninitialied'
       self.builder_result['ret'] = None
       self.builder_mode = None
-      
+
     # Should it run?
     if not self.builder and len(self.pendingbatches):
       self.builder_mode = 'batch'
@@ -296,6 +296,7 @@ class BatchTest(object):
     ready = []
     for x in builds:
       if target == 'pending' and self.build_is_queued(x):
+        x.finished = time.time()
         skip.append(x)
         x.note = "A build with this revision is already in queue"
       else:
@@ -356,7 +357,7 @@ class BatchTest(object):
       # Clean up finished builds
       for build in self.builds['running']:
         if not build.task.ready(): continue
-        
+
         taskresult = build.task.get() if build.task.successful() else False
         if taskresult is True:
           self.stat("Test %u finished" % (build.num,))
