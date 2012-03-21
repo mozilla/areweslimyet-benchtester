@@ -151,7 +151,7 @@ def get_hg_range(repodir, firstcommit, lastcommit, pullfirst=False):
     hg_ui = mercurial.ui.ui()
     repo = mercurial.hg.repository(hg_ui, repodir)
     hg_ui.readconfig(os.path.join(repodir, ".hg", "hgrc"))
-    
+
     # Pull
     if pullfirst:
       hg_ui.pushbuffer()
@@ -166,10 +166,10 @@ def get_hg_range(repodir, firstcommit, lastcommit, pullfirst=False):
     except:
       # mercurial throws all kinds of fun exceptions for bad input
       return False
-  
+
 # Gets a list of TinderboxBuild objects for all builds on ftp.m.o within
 # specified date range
-def get_tinderbox_builds(starttime = 0, endtime = int(time.time())):
+def list_tinderbox_builds(starttime = 0, endtime = int(time.time())):
   ftp = ftp_open()
   ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/mozilla-central-linux64/')
 
@@ -181,12 +181,10 @@ def get_tinderbox_builds(starttime = 0, endtime = int(time.time())):
     except: pass
   get.ret = []
   ftp.retrlines('NLST', get)
-  
-  ret = []
-  for x in sorted(get.ret):
-    ret.append(TinderboxBuild(x))
-  
-  return ret
+
+  get.ret.sort()
+
+  return get.ret
 
 #
 # Build classes
@@ -219,7 +217,7 @@ class FTPBuild(Build):
     if not ftpfile:
       _stat("Failed to download build from FTP")
       return False
-    
+
     _stat("Extracting build")
     self._extracted = _extract_build(ftpfile)
     ftpfile.close()
@@ -267,7 +265,7 @@ class CompileBuild(Build):
     import mercurial, mercurial.ui, mercurial.hg, mercurial.commands
     hg_ui = mercurial.ui.ui()
     repo = mercurial.hg.repository(hg_ui, self._repopath)
-    
+
     _stat("Getting commit info")
     commitname = commit if commit else "."
     hg_ui.pushbuffer()
@@ -277,7 +275,7 @@ class CompileBuild(Build):
     # If not set, seed testname/time with defaults from this commit
     self._committime = commitinfo[1].split('.')[0] # {date} produces a timestamp of format '123234234.0-3600'
     _stat("Commit is %s @ %s" % (self._commit, self._committime))
-    
+
   def prepare(self):
     ##
     ## Sanity checks, open log
@@ -295,7 +293,7 @@ class CompileBuild(Build):
     import mercurial, mercurial.ui, mercurial.hg, mercurial.commands
     hg_ui = mercurial.ui.ui()
     repo = mercurial.hg.repository(hg_ui, self._repopath)
-    
+
     if self._pull:
       _stat("Beginning mercurial pull")
       hg_ui.pushbuffer()
@@ -326,7 +324,7 @@ class CompileBuild(Build):
       _stat("Build failed, trying again with fresh object directory")
       shutil.rmtree(self._objdir)
       ret = build()
-      
+
     if ret != 0:
       _stat("Build with fresh object directory failed")
       return False
@@ -337,7 +335,7 @@ class CompileBuild(Build):
     if ret != 0:
       _stat("Package failed")
       return False
-      
+
     # Find package file
     # FIXME linux-specific
     distdir = os.path.join(self._objdir, "dist")

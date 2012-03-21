@@ -486,7 +486,9 @@ class BatchTest(object):
       startdate = float(batchargs['firstbuild'])
       if dorange:
         enddate = float(batchargs['lastbuild'])
-        builds.extend(BuildGetter.get_tinderbox_builds(startdate, enddate))
+        tinderbuilds = BuildGetter.list_tinderbox_builds(startdate, enddate)
+        for x in tinderbuilds:
+          builds.append(TinderboxBuild(x))
       else:
         builds.append(BuildGetter.TinderboxBuild(startdate))
     elif mode == 'build':
