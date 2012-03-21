@@ -488,7 +488,7 @@ class BatchTest(object):
         enddate = float(batchargs['lastbuild'])
         tinderbuilds = BuildGetter.list_tinderbox_builds(startdate, enddate)
         for x in tinderbuilds:
-          builds.append(TinderboxBuild(x))
+          builds.append(BuildGetter.TinderboxBuild(x))
       else:
         builds.append(BuildGetter.TinderboxBuild(startdate))
     elif mode == 'build':
