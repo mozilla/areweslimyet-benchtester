@@ -283,7 +283,7 @@ class CompileBuild(Build):
       commitinfo = hg_ui.popbuffer().split()
       # {date} produces a timestamp of format '123234234.0-3600', but the -3600
       # only indicates the timezone from which it was commited - the timestamp is always GMT
-      self._committime = commitinfo[1].split('.')[0]
+      self._committime = float(commitinfo[1].split('-')[0])
       if not self._committime:
         _stat("WARN: Failed to lookup build's effective commit time")
     else:
