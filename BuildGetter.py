@@ -279,7 +279,7 @@ class CompileBuild(Build):
       # Get the date this was merged into the tree, rather than using the commit's
       # timestamp which can be very arbitrary.
       # Literally: "When I merged with things commited before me that arn't my ancestors (or me if they doesnt exist)"
-      mercurial.commands.log(hg_ui, repo, rev=["first((:%(p)s - ::%(p)s):: and %(p)s:: or %(p)s)" % { 'p' : self._commit }], template="{node} {date}", date="", user=None, follow=None)
+      mercurial.commands.log(hg_ui, repo, rev=["limit((:%(p)s - ::%(p)s):: and %(p)s:: or %(p)s)" % { 'p' : self._commit }], template="{node} {date}", date="", user=None, follow=None)
       commitinfo = hg_ui.popbuffer().split()
       # {date} produces a timestamp of format '123234234.0-3600', but the -3600
       # only indicates the timezone from which it was commited - the timestamp is always GMT
