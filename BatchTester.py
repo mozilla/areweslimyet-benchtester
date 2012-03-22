@@ -484,7 +484,7 @@ class BatchTest(object):
           builds.append(BuildGetter.TinderboxBuild(x))
       else:
         builds.append(BuildGetter.TinderboxBuild(startdate))
-    elif mode == 'build':
+    elif mode == 'compile':
       repo = batchargs.get('repo') if batchargs.get('repo') else globalargs.get('repo')
       objdir = batchargs.get('objdir') if batchargs.get('objdir') else globalargs.get('objdir')
       mozconfig = batchargs.get('mozconfig') if batchargs.get('mozconfig') else globalargs.get('mozconfig')
@@ -569,7 +569,7 @@ class BatchTest(object):
 class BatchTestCLI(BatchTest):
   def __init__(self, args=sys.argv[1:]):
     self.parser = argparse.ArgumentParser(description='Run tests against one or more builds in parallel')
-    self.parser.add_argument('--mode', help='nightly or tinderbox or build')
+    self.parser.add_argument('--mode', help='nightly or tinderbox or compile')
     self.parser.add_argument('--batch', help='Batch mode -- given a folder name, treat each file within as containing a set of arguments to this script, deleting each file as it is processed.')
     self.parser.add_argument('--firstbuild', help='For nightly, the date (YYYY-MM-DD) of the first build to test. For tinderbox, the timestamp to start testing builds at. For build, the first revision to build.')
     self.parser.add_argument('--lastbuild', help='[optional] For nightly builds, the last date to test. For tinderbox, the timestamp to stop testing builds at. For build, the last revision to build If omitted, first_build is the only build tested.')
