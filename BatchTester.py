@@ -506,7 +506,7 @@ class BatchTest(object):
           logfile = os.path.join(globalargs.get('logdir'), "%s.build.log" % (commit,))
         else:
           logfile = None
-        builds.append(BuildGetter.CompileBuild(repo, mozconfig, objdir, pull=True, commit=commit, log=logfile))
+        builds.append(BuildGetter.CompileBuild(repo, mozconfig, objdir, pull=False, commit=commit, log=logfile))
     else:
       raise Exception("Unknown mode %s" % mode)
 
@@ -530,6 +530,10 @@ class BatchTest(object):
           build.note = "Build is incomplete on ftp.m.o"
         else:
           build.note = "Failed to lookup full revision"
+      elif not build.build.get_buildtime():
+        # Can happen with CompileBuilds when they lookup the commit, but can't
+        # find the merge commit for some reason
+        build.note = "Failed to lookup build's effective merge timestamp"
       elif hook and not hook.should_test(build, globalargs):
         if not build.note:
           build.note = "Build skipped by tester";
