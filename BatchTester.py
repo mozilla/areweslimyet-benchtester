@@ -343,7 +343,7 @@ class BatchTest(object):
           # Create a dummy batch, process it on main thread, move it to completed.
           # this all happens before the helper thread starts so there are no other
           # batches to contend with
-          self.add_batch("< Tester Restarted : Resuming interrupted builds >")
+          self.add_batch("< Tester Restarted : Resuming any interrupted builds >")
           resumebatch = self.pendingbatches.pop()
           self.processedbatches.append(resumebatch)
           resumebatch['processed'] = time.time()
@@ -411,28 +411,21 @@ class BatchTest(object):
       self.write_status()
 
       in_progress = len(self.builds['pending']) + len(self.builds['prepared']) + len(self.builds['running'])
-      if not self.builder and not self.builds['building'] and in_progress == 0:
-        # out of things to do
-        if not batchmode:
-          break # Done
-        else:
-          if self.buildindex > 0:
-            self.stat("All tasks complete. Resetting")
-            # Reset buildindex when empty to keep it from getting too large
-            # (hooks use it for vnc display # and such, which isn't infinite)
-            self.reset_pool()
-          else:
-            time.sleep(1)
-      else:
-        # Wait a little and repeat loop
-        self.tick += 1
-        if self.tick % 120 == 0:
-          # Remove items older than 1 day from these lists
-          self.builds['completed'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['completed'])
-          self.builds['failed'] = filter(lambda x: (x.finished + 60 * 60 * 24 * 3) > time.time(), self.builds['failed'])
-          self.builds['skipped'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['skipped'])
-          self.processedbatches = filter(lambda x: (x['processed'] + 60 * 60 * 24) > time.time(), self.processedbatches)
-        time.sleep(1)
+      if not self.builder and not self.builds['building'] and in_progress == 0 and (not batchmode or self.buildindex > 0):
+        # out of things to do, except in the case of batchmode where we have
+        # processed zero jobs, we exit now.
+        self.stat("All tasks complete, exiting")
+        break # Done
+      # Wait a little and repeat loop
+      time.sleep(1)
+      self.tick += 1
+      if self.tick % 120 == 0:
+        # Remove items older than 1 day from these lists
+        self.builds['completed'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['completed'])
+        self.builds['failed'] = filter(lambda x: (x.finished + 60 * 60 * 24 * 3) > time.time(), self.builds['failed'])
+        self.builds['skipped'] = filter(lambda x: (x.finished + 60 * 60 * 24) > time.time(), self.builds['skipped'])
+        self.processedbatches = filter(lambda x: (x['processed'] + 60 * 60 * 24) > time.time(), self.processedbatches)
+      time.sleep(1)
 
     self.stat("No more tasks, exiting")
     self.pool.close()
