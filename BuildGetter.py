@@ -253,6 +253,7 @@ class CompileBuild(Build):
   def __init__(self, repo, mozconfig, objdir, pull=False, commit=None, log=None):
     self._repopath = repo
     self._commit = None
+    self._committime = None
     self._mozconfig = mozconfig
     self._pull = pull
     self._objdir = objdir
@@ -272,14 +273,30 @@ class CompileBuild(Build):
     mercurial.commands.log(hg_ui, repo, rev=[commitname], template="{node} {date}", date="", user=None, follow=None)
     commitinfo = hg_ui.popbuffer().split()
     self._commit = commitinfo[0]
-    # If not set, seed testname/time with defaults from this commit
-    self._committime = commitinfo[1].split('.')[0] # {date} produces a timestamp of format '123234234.0-3600'
+
+    if self._commit:
+      hg_ui.pushbuffer()
+      # Get the date this was merged into the tree, rather than using the commit's
+      # timestamp which can be very arbitrary.
+      # Literally: "When I merged with things commited before me that arn't my ancestors (or me if they doesnt exist)"
+      mercurial.commands.log(hg_ui, repo, rev=["first((:%(p)s - ::%(p)s):: and %(p)s:: or %(p)s)" % { 'p' : self._commit }], template="{node} {date}", date="", user=None, follow=None)
+      commitinfo = hg_ui.popbuffer().split()
+      # {date} produces a timestamp of format '123234234.0-3600', but the -3600
+      # only indicates the timezone from which it was commited - the timestamp is always GMT
+      self._committime = commitinfo[1].split('.')[0]
+      if not self._committime:
+        _stat("WARN: Failed to lookup build's effective commit time")
+    else:
+      _stat("WARN: Failed to lookup build's commit in repo")
+
     _stat("Commit is %s @ %s" % (self._commit, self._committime))
 
   def prepare(self):
     ##
     ## Sanity checks, open log
     ##
+    if not self._committime or not self._commit:
+      raise Exception("Cannot continue with incompletely looked-up build")
     if not os.path.exists(self._mozconfig):
       raise Exception("Mozconfig given to CompileBuild does not exist")
     if not os.path.exists(self._repopath) or not os.path.exists(os.path.join(self._repopath, ".hg")):
