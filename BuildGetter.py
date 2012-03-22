@@ -344,11 +344,16 @@ class CompileBuild(Build):
 
     if ret != 0:
       _stat("Build with fresh object directory failed")
+      if self._logfile: self._logfile.close()
       return False
 
     _stat("Packaging")
     # Package
     ret = _subprocess({}, [ 'make', 'package' ], self._objdir, self._logfile)
+
+    # Log no longer needed
+    if self._logfile: self._logfile.close()
+
     if ret != 0:
       _stat("Package failed")
       return False
