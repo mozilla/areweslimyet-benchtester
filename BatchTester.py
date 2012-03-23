@@ -411,11 +411,17 @@ class BatchTest(object):
       self.write_status()
 
       in_progress = len(self.builds['pending']) + len(self.builds['prepared']) + len(self.builds['running'])
-      if not self.builder and not self.builds['building'] and in_progress == 0 and (not batchmode or self.buildindex > 0):
-        # out of things to do, except in the case of batchmode where we have
-        # processed zero jobs, we exit now.
-        self.stat("All tasks complete, exiting")
-        break # Done
+      if not self.builder and not self.builds['building'] and in_progress == 0:
+        # Out of things to do
+        if batchmode and self.buildindex > 0:
+          # In batchmode, reset the pool and restore buildindex to zero.
+          # Buildindex is used for things like VNC display IDs, so we don't want
+          # it to get too high.
+          self.reset_pool()
+          self.buildindex = 0
+        elif not batchmode:
+          self.stat("All tasks complete, exiting")
+          break # Done
       # Wait a little and repeat loop
       time.sleep(1)
       self.tick += 1
