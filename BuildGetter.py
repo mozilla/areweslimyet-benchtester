@@ -292,6 +292,15 @@ class CompileBuild(Build):
     _stat("Commit is %s @ %s" % (self._commit, self._committime))
 
   def prepare(self):
+    if self._log:
+      self._logfile = open(self._log, 'w')
+    try:
+      return self._prepare()
+    finally:
+      if self._logfile:
+        self._logfile.close()
+        self._logfile = None
+  def _prepare(self):
     ##
     ## Sanity checks, open log
     ##
@@ -301,8 +310,6 @@ class CompileBuild(Build):
       raise Exception("Mozconfig given to CompileBuild does not exist")
     if not os.path.exists(self._repopath) or not os.path.exists(os.path.join(self._repopath, ".hg")):
       raise Exception("Given repo does not exist or is not a mercurial repo")
-    if self._log:
-      self._logfile = open(self._log, 'w')
 
     ##
     ## Setup HG, pull if wanted
@@ -344,15 +351,11 @@ class CompileBuild(Build):
 
     if ret != 0:
       _stat("Build with fresh object directory failed")
-      if self._logfile: self._logfile.close()
       return False
 
     _stat("Packaging")
     # Package
     ret = _subprocess({}, [ 'make', 'package' ], self._objdir, self._logfile)
-
-    # Log no longer needed
-    if self._logfile: self._logfile.close()
 
     if ret != 0:
       _stat("Package failed")
