@@ -270,20 +270,44 @@ class CompileBuild(Build):
     _stat("Getting commit info")
     commitname = commit if commit else "."
     hg_ui.pushbuffer()
-    mercurial.commands.log(hg_ui, repo, rev=[commitname], template="{node} {date}", date="", user=None, follow=None)
-    commitinfo = hg_ui.popbuffer().split()
-    self._commit = commitinfo[0]
+    try:
+      mercurial.commands.log(hg_ui, repo, rev=[commitname], template="{node} {date}", date="", user=None, follow=None)
+    except Exception, e:
+      _stat("Mercurial failed to lookup revision %s <%s: %s>" % (commitname, type(e), e))
+    finally:
+      commitinfo = hg_ui.popbuffer().split()
+    self._commit = commitinfo[0] if commitinfo else None
+    time = commitinfo[1]
 
-    if self._commit:
+    def _getmerged(node):
+      print("Checking %s" % (node,))
       hg_ui.pushbuffer()
       # Get the date this was merged into the tree, rather than using the commit's
       # timestamp which can be very arbitrary.
       # Literally: "When I merged with things commited before me that arn't my ancestors (or me if they doesnt exist)"
-      mercurial.commands.log(hg_ui, repo, rev=["limit(sort(limit(sort((:%(p)s - ::%(p)s):: and %(p)s::, \"rev\"), 1) or %(p)s, \"-rev\"), 1)" % { 'p' : self._commit }], template="{node} {date}", date="", user=None, follow=None)
-      commitinfo = hg_ui.popbuffer().split()
+      try:
+        mercurial.commands.log(hg_ui, repo, rev=["limit(sort((:%(p)s - ::%(p)s):: and %(p)s::, \"rev\"), 1)" % { 'p' : node }], template="{node} {date}", date="", user=None, follow=None)
+      except Exception, e:
+        _stat("Mercurial failed to lookup revision %s <%s: %s>" % (node, type(e), e))
+        return None
+      finally:
+        commitinfo = hg_ui.popbuffer()
+
+      # Recurse to the point where the branch was one beautiful head
+      childinfo = _getmerged(commitinfo.split()[0]) if commitinfo else None
+      if childinfo:
+        return childinfo
+      else:
+        return commitinfo
+
+    if self._commit:
+      # Get the timestamp of the merge commit, if applicable
+      commitinfo = _getmerged(self._commit)
+      if commitinfo:
+        time = commitinfo.split()[1]
       # {date} produces a timestamp of format '123234234.0-3600', but the -3600
       # only indicates the timezone from which it was commited - the timestamp is always GMT
-      self._committime = int(float(commitinfo[1].split('-')[0]))
+      self._committime = int(float(time.split('-')[0]))
       if not self._committime:
         _stat("WARN: Failed to lookup build's effective commit time")
     else:
