@@ -280,7 +280,7 @@ class CompileBuild(Build):
     time = commitinfo[1]
 
     def _getmerged(node):
-      print("Checking %s" % (node,))
+      _stat("Checking node for downstream merges: %s" % (node,))
       hg_ui.pushbuffer()
       # Get the date this was merged into the tree, rather than using the commit's
       # timestamp which can be very arbitrary.
