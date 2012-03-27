@@ -86,7 +86,11 @@ class BatchBuild():
   @staticmethod
   def deserialize(buildobj, args):
     if buildobj['type'] == 'compile':
-      build = BuildGetter.CompileBuild(args.get('repo'), args.get('mozconfig'), args.get('objdir'), pull=True, commit=buildobj['revision'], log=None)
+      if args.get('logdir'):
+        logfile = os.path.join(args.get('logdir'), "%s.build.log" % (commit,))
+      else:
+        logfile = None
+      build = BuildGetter.CompileBuild(args.get('repo'), args.get('mozconfig'), args.get('objdir'), pull=True, commit=buildobj['revision'], log=logfile)
     elif buildobj['type'] == 'tinderbox':
       build = BuildGetter.TinderboxBuild(buildobj['timestamp'])
     elif buildobj['type'] == 'nightly':
