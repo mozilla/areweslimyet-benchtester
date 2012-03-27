@@ -326,7 +326,7 @@ class BatchTest(object):
     statfile = self.args.get("status_file")
 
     if self.args.get('logdir'):
-      logfile = open(os.path.join(self.args.get('logdir'), 'tester.log'), 'a')
+      self.logfile = open(os.path.join(self.args.get('logdir'), 'tester.log'), 'a')
 
     self.stat("Starting at %s with args \"%s\"" % (time.ctime(), sys.argv))
 
