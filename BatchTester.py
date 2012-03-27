@@ -87,7 +87,7 @@ class BatchBuild():
   def deserialize(buildobj, args):
     if buildobj['type'] == 'compile':
       if args.get('logdir'):
-        logfile = os.path.join(args.get('logdir'), "%s.build.log" % (commit,))
+        logfile = os.path.join(args.get('logdir'), "%s.build.log" % (buildobj['revision'],))
       else:
         logfile = None
       build = BuildGetter.CompileBuild(args.get('repo'), args.get('mozconfig'), args.get('objdir'), pull=True, commit=buildobj['revision'], log=logfile)
