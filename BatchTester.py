@@ -259,7 +259,8 @@ class BatchTest(object):
           self.builds['prepared'].append(self.builder_result['ret'])
         else:
           build.note = "Build setup failed - see log"
-          self.builds['failed'] = build
+          build.finished = time.time()
+          self.builds['failed'].append(build)
       self.builder_result['result'] = 'uninitialied'
       self.builder_result['ret'] = None
       self.builder_mode = None
