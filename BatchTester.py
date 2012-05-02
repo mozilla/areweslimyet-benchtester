@@ -74,13 +74,25 @@ def _get_hook(filename):
 # a .(de)serialize for the status.json file output
 class BatchBuild():
   def __init__(self, build, revision):
+    # BuildGetter compilebuild object
     self.build = build
+    # Revision, may be full hash or partial
     self.revision = revision
+    # Build / task number. These are sequential, but reset to zero occasionally
+    # no two *concurrently running* builds will share a number, so it can be
+    # used for e.g. non-colliding VNC display #s
     self.num = None
+    # The pool task associated with this build
     self.task = None
+    # Textual note for this build, shows up in logs and serialized Build objects.
+    # used by AWSY's /status/ page, for instance
     self.note = None
+    # Timestamp of when the build began testing
     self.started = None
+    # unique identifier per session, totally unique unlike .num. TODO should
+    # probably be given to __init__ instead of set manually later...
     self.uid = -1
+    # Timestamp of when this build was 'finished' (failed or otherwise)
     self.finished = None
     # If true, retest the build even if its already queued. --hook scripts should
     # honor this in should_test as well
