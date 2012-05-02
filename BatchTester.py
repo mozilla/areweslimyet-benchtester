@@ -82,6 +82,9 @@ class BatchBuild():
     self.started = None
     self.uid = -1
     self.finished = None
+    # If true, retest the build even if its already queued. --hook scripts should
+    # honor this in should_test as well
+    self.force = None
 
   @staticmethod
   def deserialize(buildobj, args):
@@ -104,6 +107,7 @@ class BatchBuild():
     ret.note = buildobj['note']
     ret.started = buildobj['started']
     ret.finished = buildobj['finished']
+    ret.force = buildobj['force']
 
     return ret
 
@@ -114,6 +118,7 @@ class BatchBuild():
       'note' : self.note,
       'started' : self.started,
       'finished' : self.finished,
+      'force' : self.force,
       'uid' : self.uid
     }
 
@@ -300,7 +305,7 @@ class BatchTest(object):
     skip = []
     ready = []
     for x in builds:
-      if target == 'pending' and self.build_is_queued(x):
+      if not x.force and target == 'pending' and self.build_is_queued(x):
         x.finished = time.time()
         skip.append(x)
         x.note = "A build with this revision is already in queue"
@@ -516,6 +521,7 @@ class BatchTest(object):
 
     readybuilds = []
     skippedbuilds = []
+    force = batchargs.get('retest') if batchargs.get('retest') else globalargs.get('retest')
     for build in builds:
       rev = build.get_revision()
       fullrev = rev
@@ -528,6 +534,7 @@ class BatchTest(object):
           fullrev = None
 
       build = BatchBuild(build, fullrev)
+      build.force = force
       if not fullrev:
         if not rev:
           # Can only happen with FTP builds we failed to lookup on ftp.m.o
@@ -594,6 +601,7 @@ class BatchTestCLI(BatchTest):
     self.parser.add_argument('--status-file', help="A file to keep a json-dump of the currently running job status in. This file is mv'd into place to avoid read/write issues")
     self.parser.add_argument('--status-resume', action='store_true', help="Resume any jobs still present in the status file. Useful for interrupted sessions")
     self.parser.add_argument('--prioritize', action='store_true', help="For batch'd builds, insert at the beginning of the pending queue rather than the end")
+    self.parser.add_argument('--force', action='store_true', help="Test/queue given builds even if they have already been tested or are already in queue")
     temp = vars(self.parser.parse_known_args(args)[0])
     if temp.get('hook'):
       mod = _get_hook(temp.get('hook'))
