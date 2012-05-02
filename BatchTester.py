@@ -533,7 +533,7 @@ class BatchTest(object):
 
     readybuilds = []
     skippedbuilds = []
-    force = batchargs.get('retest') if batchargs.get('retest') else globalargs.get('retest')
+    force = batchargs.get('force') if batchargs.get('force') else globalargs.get('force')
     for build in builds:
       rev = build.get_revision()
       fullrev = rev
