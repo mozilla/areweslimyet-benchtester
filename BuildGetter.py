@@ -22,7 +22,11 @@ import tarfile
 import tempfile
 import datetime
 import subprocess
+import json
+import urllib
+import urllib2
 
+gPushlog = 'https://hg.mozilla.org/mozilla-central/json-pushes'
 output = sys.stdout
 
 # socket.setdefaulttimeout(30)
@@ -66,6 +70,34 @@ def _extract_build(fileobject):
   tar.extractall(path=ret)
   tar.close()
   return ret
+
+##
+## hg.m.o pushlog query
+##
+
+def pushlog_lookup(rev):
+  try:
+    raw = urllib2.urlopen("%s?changeset=%s" % (gPushlog, rev), timeout=30).read()
+  except (IOError, urllib2.URLError) as e:
+    _stat("ERR: Failed to query pushlog for changeset %s: %s - %s" % (rev, type(e), e))
+    return False
+  try:
+    pushlog = json.loads(raw)
+    if len(pushlog) != 1:
+      raise ValueError("Pushlog returned %u items, expected 1" % len(pushlog))
+    for cset in pushlog[pushlog.keys()[0]]['changesets']:
+      if cset.startswith(rev):
+        break
+    else:
+      raise ValueError("Pushlog returned a push that does not contain this revision?")
+
+  except ValueError as e:
+    _stat("ERR: pushlog returned invalid JSON for changeset %s\n  Error was:\n    %s - %s\n  JSON:\     %s" % (rev, type(e), e, raw))
+    return False
+
+  push = pushlog[pushlog.keys()[0]]
+  _stat("For rev %s got push by %s at %u with %u changesets" % (rev, push['user'], push['date'], len(push['changesets'])))
+  return push['date']
 
 ##
 ## Working with ftp.m.o
@@ -253,7 +285,6 @@ class CompileBuild(Build):
   def __init__(self, repo, mozconfig, objdir, pull=False, commit=None, log=None):
     self._repopath = repo
     self._commit = None
-    self._committime = None
     self._mozconfig = mozconfig
     self._pull = pull
     self._objdir = objdir
@@ -277,43 +308,7 @@ class CompileBuild(Build):
     finally:
       commitinfo = hg_ui.popbuffer().split()
     self._commit = commitinfo[0] if commitinfo else None
-    time = commitinfo[1]
-
-    def _getmerged(node):
-      _stat("Checking node for downstream merges: %s" % (node,))
-      hg_ui.pushbuffer()
-      # Get the date this was merged into the tree, rather than using the commit's
-      # timestamp which can be very arbitrary.
-      # Literally: "When I merged with things commited before me that arn't my ancestors (or me if they doesnt exist)"
-      try:
-        mercurial.commands.log(hg_ui, repo, rev=["limit(sort((:%(p)s - ::%(p)s):: and %(p)s::, \"rev\"), 1)" % { 'p' : node }], template="{node} {date}", date="", user=None, follow=None)
-      except Exception, e:
-        _stat("Mercurial failed to lookup revision %s <%s: %s>" % (node, type(e), e))
-        return None
-      finally:
-        commitinfo = hg_ui.popbuffer()
-
-      # Recurse to the point where the branch was one beautiful head
-      childinfo = _getmerged(commitinfo.split()[0]) if commitinfo else None
-      if childinfo:
-        return childinfo
-      else:
-        return commitinfo
-
-    if self._commit:
-      # Get the timestamp of the merge commit, if applicable
-      commitinfo = _getmerged(self._commit)
-      if commitinfo:
-        time = commitinfo.split()[1]
-      # {date} produces a timestamp of format '123234234.0-3600', but the -3600
-      # only indicates the timezone from which it was commited - the timestamp is always GMT
-      self._committime = int(float(time.split('-')[0]))
-      if not self._committime:
-        _stat("WARN: Failed to lookup build's effective commit time")
-    else:
-      _stat("WARN: Failed to lookup build's commit in repo")
-
-    _stat("Commit is %s @ %s" % (self._commit, self._committime))
+    self._timestamp = pushlog_lookup(self._commit)
 
   def prepare(self):
     if self._log:
@@ -324,11 +319,12 @@ class CompileBuild(Build):
       if self._logfile:
         self._logfile.close()
         self._logfile = None
+
   def _prepare(self):
     ##
-    ## Sanity checks, open log
+    ## Lookup timestamp, sanity checks
     ##
-    if not self._committime or not self._commit:
+    if not self._timestamp or not self._commit:
       raise Exception("Cannot continue with incompletely looked-up build")
     if not os.path.exists(self._mozconfig):
       raise Exception("Mozconfig given to CompileBuild does not exist")
@@ -413,7 +409,7 @@ class CompileBuild(Build):
     return True;
 
   def get_buildtime(self):
-    return self._committime
+    return self._timestamp
 
   def get_binary(self):
     if not self._prepared:
@@ -468,24 +464,24 @@ class NightlyBuild(FTPBuild):
         break
 
     if ret:
-      self._timestamp = timestamp
       self._revision = revision
+      self._timestamp = pushlog_lookup(self._revision)
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(FTPBuild):
   def __init__(self, timestamp):
-    self._timestamp = int(timestamp)
+    timestamp = int(timestamp)
     self._prepared = False
     self._revision = None
 
     basedir = "/pub/firefox/tinderbox-builds/mozilla-central-linux64"
     ftp = ftp_open()
     ftp.voidcmd('CWD %s' % (basedir,))
-    ret = _ftp_check_build_dir(ftp, self._timestamp)
+    ret = _ftp_check_build_dir(ftp, timestamp)
     if not ret:
-      _stat("WARN: Tinderbox build %s was not found" % (self._timestamp,))
+      _stat("WARN: Tinderbox build %s was not found" % (timestamp,))
       return
     (timestamp, self._revision, filename) = ret
 
     self._filename = "%s/%s/%s" % (basedir, timestamp, filename)
-
+    self._timestamp = pushlog_lookup(self._revision)
