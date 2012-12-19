@@ -239,19 +239,18 @@ class BenchTester():
       cur = self.sqlite.cursor()
       for schema in gTableSchemas:
         cur.execute(schema)
-      # Create build ID
+      # Create/update build ID
       cur.execute("SELECT `time`, `id` FROM `benchtester_builds` WHERE `name` = ?", [ self.buildname ])
       buildrow = cur.fetchone()
+      if buildrow and buildrow[0] != int(self.buildtime):
+        self.error("Build '%s' already exists in the database, but with a differing timestamp. Overwriting old record (%s -> %s)" % (self.buildname, buildrow[0], self.buildtime))
+        buildrow = None
+
       if not buildrow:
-        self.info("No previous tests for this build, creating new build record")
-        cur.execute("INSERT INTO `benchtester_builds` (`name`, `time`) VALUES (?, ?)", (self.buildname, int(self.buildtime)))
+        self.info("Creating new build record")
+        cur.execute("REPLACE INTO `benchtester_builds` (`name`, `time`) VALUES (?, ?)", (self.buildname, int(self.buildtime)))
         cur.execute("SELECT last_insert_rowid()")
         self.build_id = cur.fetchone()[0]
-      elif buildrow[0] != int(self.buildtime):
-        self.sqlite.rollback()
-        self.error("Build '%s' already exists in the database, but with a different timestamp! (%s)" % (self.buildname, buildrow[0]))
-        self.sqlite = self.sqlitedb = self.args['sqlitedb'] = None
-        return False
       else:
         self.build_id = buildrow[1]
         self.info("Found build record")
