@@ -29,8 +29,6 @@ import urllib2
 gPushlog = 'https://hg.mozilla.org/mozilla-central/json-pushes'
 output = sys.stdout
 
-# socket.setdefaulttimeout(30)
-
 # TODO
 # This currently selects the linux-64 (non-pgo) build
 # hardcoded at a few spots. This will need to be changed for non-linux testing
@@ -240,7 +238,8 @@ class Build():
 # Abstract class with shared helpers for TinderboxBuild/NightlyBuild
 class FTPBuild(Build):
   def prepare(self):
-    if not self._revision:
+    if not self._revision or not self._timestamp:
+      _stat("Cannot setup build that failed lookup")
       return False
 
     ftp = ftp_open()
@@ -406,7 +405,7 @@ class CompileBuild(Build):
     if self._prepared:
       shutil.rmtree(self._extracted)
       self._prepared = False
-    return True;
+    return True
 
   def get_buildtime(self):
     return self._timestamp
@@ -474,6 +473,7 @@ class TinderboxBuild(FTPBuild):
     self._prepared = False
     self._revision = None
 
+    # FIXME hardcoded linux stuff
     basedir = "/pub/firefox/tinderbox-builds/mozilla-central-linux64"
     ftp = ftp_open()
     ftp.voidcmd('CWD %s' % (basedir,))
