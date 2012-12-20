@@ -244,7 +244,7 @@ class BenchTester():
       buildrow = cur.fetchone()
 
       if buildrow and buildrow[0] != int(self.buildtime):
-        self.error("Build '%s' already exists in the database, but with a differing timestamp. Overwriting old record (%s -> %s)" % (self.buildname, buildrow[0], self.buildtime))
+        self.warn("Build '%s' already exists in the database, but with a differing timestamp. Overwriting old record (%s -> %s)" % (self.buildname, buildrow[0], self.buildtime))
         cur.execute("UPDATE `benchtester_builds` SET `time` = ? WHERE `id` = ?", [ int(self.buildtime), buildrow[1] ])
         self.build_id = buildrow[1]
       elif not buildrow:
