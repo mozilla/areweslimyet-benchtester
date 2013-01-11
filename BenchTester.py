@@ -19,23 +19,26 @@ gTableSchemas = [
   # Builds - info on builds we have tests for
   '''CREATE TABLE IF NOT EXISTS
       "benchtester_builds" ("id" INTEGER PRIMARY KEY NOT NULL,
-                          "name" VARCHAR NOT NULL,
-                          "time" DATETIME NOT NULL)''',
-                          
+                           "name" VARCHAR NOT NULL UNIQUE,
+                           "time" DATETIME NOT NULL)''',
+
   # Tests - tests that have been run and against which build
   '''CREATE TABLE IF NOT EXISTS
       "benchtester_tests" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                         "name" VARCHAR NOT NULL,
-                         "time" DATETIME NOT NULL,
-                         "build_id" INTEGER NOT NULL,
-                         "successful" INTEGER NOT NULL)''',
-                         
+                          "name" VARCHAR NOT NULL,
+                          "time" DATETIME NOT NULL,
+                          "build_id" INTEGER NOT NULL,
+                          "successful" INTEGER NOT NULL)''',
+
+  # Datapoints - names of datapoints
+  '''CREATE TABLE IF NOT EXISTS
+      "benchtester_datapoints" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                "name" VARCHAR NOT NULL UNIQUE)''',
   # Data - datapoints from tests
   '''CREATE TABLE IF NOT EXISTS
       "benchtester_data" ("test_id" INTEGER NOT NULL,
-                        "datapoint" VARCHAR NOT NULL,
-                        "value" INTEGER,
-                        PRIMARY KEY ("test_id", "datapoint"))''',
+                          "datapoint_id" INTEGER NOT NULL,
+                          "value" INTEGER NOT NULL)''',
   # Some default indexes
   '''CREATE INDEX IF NOT EXISTS test_lookup ON benchtester_tests ( name, build_id DESC )''',
   '''CREATE INDEX IF NOT EXISTS data_for_test ON benchtester_data ( test_id DESC )'''
@@ -148,11 +151,19 @@ class BenchTester():
     if self.sqlite:
       try:
         cur = self.sqlite.cursor()
-        cur.execute("INSERT INTO `benchtester_tests` (`name`, `time`, `build_id`, `successful`) VALUES (?, ?, ?, ?)", (testname, int(timestamp), self.build_id, succeeded))
+        cur.execute("INSERT INTO "
+                    "  benchtester_tests(name, time, build_id, successful) "
+                    "VALUES (?, ?, ?, ?)",
+                    (testname, int(timestamp), self.build_id, succeeded))
         cur.execute("SELECT last_insert_rowid()")
         testid = cur.fetchone()[0]
         for datapoint, val in datapoints.iteritems():
-          cur.execute("INSERT INTO `benchtester_data` (`test_id`, `datapoint`, `value`) VALUES (?, ?, ?)", (testid, datapoint, val))
+          cur.execute("INSERT OR IGNORE INTO `benchtester_datapoints`(name) "
+                      "VALUES (?)", [ datapoint ])
+          cur.execute("INSERT INTO `benchtester_data` "
+                      "SELECT ?, p.id, ? FROM `benchtester_datapoints` p "
+                      "WHERE p.name = ?",
+                      (testid, val, datapoint))
         self.sqlite.commit()
       except Exception, e:
         self.error("Failed to insert data into sqlite, got '%s': %s" % (type(e), e))
