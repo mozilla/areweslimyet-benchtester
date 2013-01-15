@@ -246,7 +246,7 @@ class BenchTester():
       return False
     try:
       sql_path = os.path.abspath(self.args['sqlitedb'])
-      self.sqlite = sqlite3.connect(sql_path, 60)
+      self.sqlite = sqlite3.connect(sql_path, timeout=300)
       cur = self.sqlite.cursor()
       for schema in gTableSchemas:
         cur.execute(schema)
