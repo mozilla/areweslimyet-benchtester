@@ -41,7 +41,7 @@ gTableSchemas = [
                           "value" INTEGER NOT NULL)''',
   # Some default indexes
   '''CREATE INDEX IF NOT EXISTS test_lookup ON benchtester_tests ( name, build_id DESC )''',
-  '''CREATE INDEX IF NOT EXISTS data_for_test ON benchtester_data ( test_id DESC )'''
+  '''CREATE INDEX IF NOT EXISTS data_for_test ON benchtester_data ( test_id DESC, datapoint_id )'''
 ];
 
 # TODO:
