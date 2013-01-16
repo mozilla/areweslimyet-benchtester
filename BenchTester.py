@@ -135,17 +135,17 @@ class BenchTester():
       return self.error("Failed to load module '%s', Exception '%s': %s" % (modname, type(e), e))
         
     return True
-    
+
   def add_test_results(self, testname, datapoints, succeeded=True):
     # Ensure DB is open
     if not self._open_db():
       return self.error("Failed to open sqlite database")
-    
+
     if not testname or not len(datapoints):
       return self.error("Invalid use of addDataPoint()")
-    
+
     timestamp = time.time()
-    
+
     #for datapoint, val in datapoints.iteritems():
     #  self.info("Datapoint: Test '%s', Datapoint '%s', Value '%s'" % (testname, datapoint, val))
     if self.sqlite:
@@ -157,20 +157,27 @@ class BenchTester():
                     (testname, int(timestamp), self.build_id, succeeded))
         cur.execute("SELECT last_insert_rowid()")
         testid = cur.fetchone()[0]
-        for datapoint, val in datapoints.iteritems():
-          cur.execute("INSERT OR IGNORE INTO `benchtester_datapoints`(name) "
-                      "VALUES (?)", [ datapoint ])
-          cur.execute("INSERT INTO `benchtester_data` "
-                      "SELECT ?, p.id, ? FROM `benchtester_datapoints` p "
-                      "WHERE p.name = ?",
-                      (testid, val, datapoint))
+        insertbegin = time.time()
+        self.info("Inserting %u datapoints into DB" % len(datapoints))
+        cur.executemany("INSERT OR IGNORE INTO `benchtester_datapoints`(name) "
+                        "VALUES (?)",
+                        ([datapoint] for datapoint, val in datapoints.iteritems()))
         self.sqlite.commit()
+        self.info("Filled datapoint names in %.02fs" % (time.time() - insertbegin))
+        insertbegin = time.time()
+        cur.executemany("INSERT INTO `benchtester_data` "
+                        "SELECT ?, p.id, ? FROM `benchtester_datapoints` p "
+                        "WHERE p.name = ?",
+                        ( [testid, val, datapoint]
+                          for datapoint, val in datapoints.iteritems()))
+        self.sqlite.commit()
+        self.info("Filled datapoint values in %.02fs" % (time.time() - insertbegin))
       except Exception, e:
         self.error("Failed to insert data into sqlite, got '%s': %s" % (type(e), e))
         self.sqlite.rollback()
         return False
     return True
-    
+
   def __init__(self, out=sys.stdout):
     self.starttime = time.clock()
     self.ready = False
