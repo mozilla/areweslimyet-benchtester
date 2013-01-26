@@ -142,13 +142,12 @@ class EnduranceTest(BenchTester.BenchTest):
         iternum = int(label_re.group(2))
         label = label_re.group(1)
         for memtype,memval in checkpoint['memory'].items():
-          prefix = ""
           if type(memval) is dict:
-            prefix = memval['units'] + ":"
+            prefix = memval['unit'] + ":"
             memval = memval['val']
           else:
             prefix = ""
-          results["/".join(["%sIteration %u" % prefix, iternum, label, memtype])] = memval
+          results["/".join(["%sIteration %u" % (prefix, iternum), label, memtype])] = memval
 
     if not self.tester.add_test_results(testname, results, successful):
       return self.error("Failed to save test results")
