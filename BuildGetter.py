@@ -469,10 +469,11 @@ class NightlyBuild(FTPBuild):
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(FTPBuild):
   def __init__(self, timestamp):
-    timestamp = int(timestamp)
+    self._tinderbox_timestamp = int(timestamp)
     self._prepared = False
     self._revision = None
-    self._timestamp = None
+    # Use this as the timestamp if finding the build fails
+    self._timestamp = self._tinderbox_timestamp()
 
     # FIXME hardcoded linux stuff
     basedir = "/pub/firefox/tinderbox-builds/mozilla-central-linux64"
@@ -486,3 +487,6 @@ class TinderboxBuild(FTPBuild):
 
     self._filename = "%s/%s/%s" % (basedir, timestamp, filename)
     self._timestamp = pushlog_lookup(self._revision)
+
+  def get_tinderbox_timestamp(self):
+    return self._tinderbox_timestamp

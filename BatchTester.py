@@ -137,6 +137,9 @@ class BatchBuild():
     if isinstance(self.build, BuildGetter.CompileBuild):
       ret['type'] = 'compile'
     elif isinstance(self.build, BuildGetter.TinderboxBuild):
+      # When deserializing we need to look this up by it's tinderbox timestamp,
+      # even if we use the push timestamp internally
+      ret['timestamp'] = self.build.get_tinderbox_timestamp()
       ret['type'] = 'tinderbox'
     elif isinstance(self.build, BuildGetter.NightlyBuild):
       # Date of nightly might not correspond to build timestamp
