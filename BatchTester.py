@@ -87,6 +87,8 @@ class BatchBuild():
     # Textual note for this build, shows up in logs and serialized Build objects.
     # used by AWSY's /status/ page, for instance
     self.note = None
+    # Place in a custom series
+    self.series = None
     # Timestamp of when the build began testing
     self.started = None
     # unique identifier per session, totally unique unlike .num. TODO should
@@ -116,6 +118,7 @@ class BatchBuild():
       raise Exception("Unkown build type %s" % buildobj['type'])
 
     ret = BatchBuild(build, buildobj['revision'])
+    ret.series = buildobj['series']
     ret.uid = buildobj['uid']
     ret.timestamp = buildobj['timestamp']
     ret.note = buildobj['note']
@@ -133,7 +136,8 @@ class BatchBuild():
       'started' : self.started,
       'finished' : self.finished,
       'force' : self.force,
-      'uid' : self.uid
+      'uid' : self.uid,
+      'series': self.series
     }
 
     if isinstance(self.build, BuildGetter.CompileBuild):
