@@ -236,7 +236,7 @@ class Build():
     raise Exception("Attempt to call method on abstract base class")
 
 # Abstract class with shared helpers for TinderboxBuild/NightlyBuild
-class FTPBuild(Build):
+class BaseFTPBuild(Build):
   def prepare(self):
     if not self._revision or not self._timestamp:
       _stat("Cannot setup build that failed lookup")
@@ -419,8 +419,34 @@ class CompileBuild(Build):
   def get_revision(self):
     return self._commit
 
-# A nightly build. Initialized with a date() object or a YYYY-MM-DD string
-class NightlyBuild(FTPBuild):
+# A build that simply points to a FTP directory on ftp.m.o
+# TODO currently we just hard-code 64bit-linux builds...
+class FTPBuild(BaseFTPBuild):
+  def __init__(self, path):
+    self._prepared = False
+    self._path = path
+
+    _stat("Checking for linux-64 build at %s" % (path,))
+
+    ftp = ftp_open()
+    try:
+      ftp.voidcmd('CWD %s' % path)
+    except:
+      _stat("Could not change to directory %s" % path)
+      return
+
+    ret = _ftp_check_build_dir(ftp, path)
+    if not ret:
+      _stat("No linux64 build found")
+      return
+
+    (timestamp, self._revision, filename) = ret
+    self._timestamp = pushlog_lookup(revision)
+
+    self._filename = "%s/%s" % (path, filename)
+
+# a nightly build. Initialized with a date() object or a YYYY-MM-DD string
+class NightlyBuild(BaseFTPBuild):
   def __init__(self, date):
     self._prepared = False
     self._date = date
@@ -467,7 +493,7 @@ class NightlyBuild(FTPBuild):
       self._timestamp = pushlog_lookup(self._revision)
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
-class TinderboxBuild(FTPBuild):
+class TinderboxBuild(BaseFTPBuild):
   def __init__(self, timestamp):
     self._tinderbox_timestamp = int(timestamp)
     self._prepared = False

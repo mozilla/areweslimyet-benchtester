@@ -110,6 +110,8 @@ class BatchBuild():
       build = BuildGetter.TinderboxBuild(buildobj['timestamp'])
     elif buildobj['type'] == 'nightly':
       build = BuildGetter.NightlyBuild(parse_nightly_time(buildobj['for']))
+    elif buildobj['type'] == 'ftp':
+      build = BuildGetter.FTPBuild(buildobj['path'])
     else:
       raise Exception("Unkown build type %s" % buildobj['type'])
 
@@ -136,6 +138,9 @@ class BatchBuild():
 
     if isinstance(self.build, BuildGetter.CompileBuild):
       ret['type'] = 'compile'
+    elif isinstance(self.build, BuildGetter.FTPBuild):
+      ret['type'] = 'ftp'
+      ret['path'] = self.build._path
     elif isinstance(self.build, BuildGetter.TinderboxBuild):
       # When deserializing we need to look this up by it's tinderbox timestamp,
       # even if we use the push timestamp internally
@@ -515,6 +520,8 @@ class BatchTest(object):
           builds.append(BuildGetter.TinderboxBuild(x))
       else:
         builds.append(BuildGetter.TinderboxBuild(startdate))
+    elif mode == 'ftp':
+      builds.append(BuildGetter.FTPBuild(batchargs['path']))
     elif mode == 'compile':
       repo = batchargs.get('repo') if batchargs.get('repo') else globalargs.get('repo')
       objdir = batchargs.get('objdir') if batchargs.get('objdir') else globalargs.get('objdir')
