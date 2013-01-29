@@ -554,6 +554,7 @@ class BatchTest(object):
 
       build = BatchBuild(build, rev)
       build.force = force
+      build.series = batchargs.get('series')
       if not rev:
         # Can happen with FTP builds we failed to lookup on ftp.m.o
         build.note = "Build is not found or incomplete on ftp.m.o"
