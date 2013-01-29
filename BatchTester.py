@@ -109,7 +109,7 @@ class BatchBuild():
         logfile = None
       build = BuildGetter.CompileBuild(args.get('repo'), args.get('mozconfig'), args.get('objdir'), pull=True, commit=buildobj['revision'], log=logfile)
     elif buildobj['type'] == 'tinderbox':
-      build = BuildGetter.TinderboxBuild(buildobj['timestamp'])
+      build = BuildGetter.TinderboxBuild(buildobj['timestamp'], buildobj['branch'])
     elif buildobj['type'] == 'nightly':
       build = BuildGetter.NightlyBuild(parse_nightly_time(buildobj['for']))
     elif buildobj['type'] == 'ftp':
@@ -150,6 +150,7 @@ class BatchBuild():
       # even if we use the push timestamp internally
       ret['timestamp'] = self.build.get_tinderbox_timestamp()
       ret['type'] = 'tinderbox'
+      ret['branch'] = self.build.get_branch()
     elif isinstance(self.build, BuildGetter.NightlyBuild):
       # Date of nightly might not correspond to build timestamp
       ret['for'] = '%u-%u-%u' % (self.build._date.year, self.build._date.month, self.build._date.day)
