@@ -26,7 +26,7 @@ import json
 import urllib
 import urllib2
 
-gDefaultBranch = 'mozilla-central'
+gDefaultBranch = 'mozilla-inbound'
 gPushlog = 'https://hg.mozilla.org/%s/json-pushes'
 output = sys.stdout
 
