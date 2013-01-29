@@ -168,9 +168,9 @@ def _ftp_check_build_dir(ftp, dirname):
 
   # This file has had lines changed in the past, just find a numeric line
   # and a url-of-revision-lookin' line
-  m = re.search('^[0-9]{14}$', filedat)
+  m = re.search('^[0-9]{14}$', filedat, re.MULTILINE)
   timestamp = int(time.mktime(time.strptime(m.group(0), '%Y%m%d%H%M%S')))
-  m = re.search('https?://hg.mozilla.org/([^/]+)/rev/([0-9a-z]{12})$', filedat)
+  m = re.search('^https?://hg.mozilla.org/([^/]+)/rev/([0-9a-z]{12})$', filedat, re.MULTILINE)
   rev = m.group(2)
   branch = m.group(1)
   nightlyfile = infofile[:-4] + ".tar.bz2"
