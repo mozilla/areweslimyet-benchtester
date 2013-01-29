@@ -525,7 +525,7 @@ class BatchTest(object):
       else:
         builds.append(BuildGetter.TinderboxBuild(startdate))
     elif mode == 'ftp':
-      builds.append(BuildGetter.FTPBuild(batchargs['path']))
+      builds.append(BuildGetter.FTPBuild(batchargs['firstbuild']))
     elif mode == 'compile':
       repo = batchargs.get('repo') if batchargs.get('repo') else globalargs.get('repo')
       objdir = batchargs.get('objdir') if batchargs.get('objdir') else globalargs.get('objdir')
