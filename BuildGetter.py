@@ -499,7 +499,7 @@ class TinderboxBuild(BaseFTPBuild):
     self._prepared = False
     self._revision = None
     # Use this as the timestamp if finding the build fails
-    self._timestamp = self._tinderbox_timestamp()
+    self._timestamp = self._tinderbox_timestamp
 
     # FIXME hardcoded linux stuff
     basedir = "/pub/firefox/tinderbox-builds/mozilla-central-linux64"
