@@ -26,7 +26,7 @@ import json
 import urllib
 import urllib2
 
-gPushlog = 'https://hg.mozilla.org/mozilla-central/json-pushes'
+gPushlog = 'https://hg.mozilla.org/%s/json-pushes'
 output = sys.stdout
 
 # TODO
@@ -73,11 +73,12 @@ def _extract_build(fileobject):
 ## hg.m.o pushlog query
 ##
 
-def pushlog_lookup(rev):
+def pushlog_lookup(rev, branch = "mozilla-central"):
+  pushlog = gPushLog % (branch,)
   try:
-    raw = urllib2.urlopen("%s?changeset=%s" % (gPushlog, rev), timeout=30).read()
+    raw = urllib2.urlopen("%s?changeset=%s" % (pushlog, rev), timeout=30).read()
   except (IOError, urllib2.URLError) as e:
-    _stat("ERR: Failed to query pushlog for changeset %s: %s - %s" % (rev, type(e), e))
+    _stat("ERR: Failed to query pushlog for changeset %s on %s: %s - %s" % (rev, branch, type(e), e))
     return False
   try:
     pushlog = json.loads(raw)
@@ -94,7 +95,7 @@ def pushlog_lookup(rev):
     return False
 
   push = pushlog[pushlog.keys()[0]]
-  _stat("For rev %s got push by %s at %u with %u changesets" % (rev, push['user'], push['date'], len(push['changesets'])))
+  _stat("For rev %s on branch %s got push by %s at %u with %u changesets" % (rev, branch, push['user'], push['date'], len(push['changesets'])))
   return push['date']
 
 ##
@@ -165,13 +166,16 @@ def _ftp_check_build_dir(ftp, dirname):
 
   _stat("Got build info: %s" % filedat)
 
-  m = re.search('^[0-9]{14}', filedat)
+  # This file has had lines changed in the past, just find a numeric line
+  # and a url-of-revision-lookin' line
+  m = re.search('^[0-9]{14}$', filedat)
   timestamp = int(time.mktime(time.strptime(m.group(0), '%Y%m%d%H%M%S')))
-  m = re.search('([0-9a-z]{12})$', filedat)
-  rev = m.group(1)
+  m = re.search('https?://hg.mozilla.org/([^/]+)/rev/([0-9a-z]{12})$', filedat)
+  rev = m.group(2)
+  branch = m.group(1)
   nightlyfile = infofile[:-4] + ".tar.bz2"
 
-  return (timestamp, rev, nightlyfile)
+  return (timestamp, rev, branch, nightlyfile)
 
 # Returns a list of commit IDs between two revisions, inclusive. If pullfirst is
 # set, pull before checking
@@ -440,8 +444,8 @@ class FTPBuild(BaseFTPBuild):
       _stat("No linux64 build found")
       return
 
-    (timestamp, self._revision, filename) = ret
-    self._timestamp = pushlog_lookup(self._revision)
+    (timestamp, self._revision, branch, filename) = ret
+    self._timestamp = pushlog_lookup(self._revision, branch)
     self._filename = "%s/%s" % (path, filename)
 
 # a nightly build. Initialized with a date() object or a YYYY-MM-DD string
@@ -483,7 +487,7 @@ class NightlyBuild(BaseFTPBuild):
     for x in nightlydirs:
       ret = _ftp_check_build_dir(ftp, x)
       if ret:
-        (timestamp, revision, filename) = ret
+        (timestamp, revision, _, filename) = ret
         self._filename = "%s/%s/%s" % (nightlydir, x, filename)
         break
 
@@ -508,7 +512,7 @@ class TinderboxBuild(BaseFTPBuild):
     if not ret:
       _stat("WARN: Tinderbox build %s was not found" % (timestamp,))
       return
-    (timestamp, self._revision, filename) = ret
+    (timestamp, self._revision, _, filename) = ret
 
     self._filename = "%s/%s/%s" % (basedir, timestamp, filename)
     self._timestamp = pushlog_lookup(self._revision)
