@@ -26,6 +26,7 @@ import json
 import urllib
 import urllib2
 
+gDefaultBranch = 'mozilla-central'
 gPushlog = 'https://hg.mozilla.org/%s/json-pushes'
 output = sys.stdout
 
@@ -73,7 +74,7 @@ def _extract_build(fileobject):
 ## hg.m.o pushlog query
 ##
 
-def pushlog_lookup(rev, branch = "mozilla-central"):
+def pushlog_lookup(rev, branch = gDefaultBranch):
   pushlog = gPushlog % (branch,)
   try:
     raw = urllib2.urlopen("%s?changeset=%s" % (pushlog, rev), timeout=30).read()
@@ -203,9 +204,9 @@ def get_hg_range(repodir, firstcommit, lastcommit, pullfirst=False):
 
 # Gets a list of TinderboxBuild objects for all builds on ftp.m.o within
 # specified date range
-def list_tinderbox_builds(starttime = 0, endtime = int(time.time())):
+def list_tinderbox_builds(starttime = 0, endtime = int(time.time()), branch = gDefaultBranch):
   ftp = ftp_open()
-  ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/mozilla-central-linux64/')
+  ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/%s-linux64/' % (branch,))
 
   def get(line):
     try:
@@ -496,16 +497,17 @@ class NightlyBuild(BaseFTPBuild):
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(BaseFTPBuild):
-  def __init__(self, timestamp):
+  def __init__(self, timestamp, branch = gDefaultBranch):
     timestamp = int(timestamp)
     self._tinderbox_timestamp = timestamp
     self._prepared = False
     self._revision = None
     # Use this as the timestamp if finding the build fails
     self._timestamp = self._tinderbox_timestamp
+    self._branch = branch
 
     # FIXME hardcoded linux stuff
-    basedir = "/pub/firefox/tinderbox-builds/mozilla-central-linux64"
+    basedir = "/pub/firefox/tinderbox-builds/%s-linux64" % (branch,)
     ftp = ftp_open()
     ftp.voidcmd('CWD %s' % (basedir,))
     ret = _ftp_check_build_dir(ftp, timestamp)
@@ -519,3 +521,6 @@ class TinderboxBuild(BaseFTPBuild):
 
   def get_tinderbox_timestamp(self):
     return self._tinderbox_timestamp
+
+  def get_branch(self):
+    return self._branch
