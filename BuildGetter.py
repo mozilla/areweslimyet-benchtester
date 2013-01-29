@@ -74,7 +74,7 @@ def _extract_build(fileobject):
 ##
 
 def pushlog_lookup(rev, branch = "mozilla-central"):
-  pushlog = gPushLog % (branch,)
+  pushlog = gPushlog % (branch,)
   try:
     raw = urllib2.urlopen("%s?changeset=%s" % (pushlog, rev), timeout=30).read()
   except (IOError, urllib2.URLError) as e:
