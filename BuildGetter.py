@@ -26,7 +26,7 @@ import json
 import urllib
 import urllib2
 
-gDefaultBranch = 'mozilla-inbound'
+gDefaultBranch = 'integration/mozilla-inbound'
 gPushlog = 'https://hg.mozilla.org/%s/json-pushes'
 output = sys.stdout
 
@@ -171,7 +171,7 @@ def _ftp_check_build_dir(ftp, dirname):
   # and a url-of-revision-lookin' line
   m = re.search('^[0-9]{14}$', filedat, re.MULTILINE)
   timestamp = int(time.mktime(time.strptime(m.group(0), '%Y%m%d%H%M%S')))
-  m = re.search('^https?://hg.mozilla.org/([^/]+)/rev/([0-9a-z]{12})$', filedat, re.MULTILINE)
+  m = re.search('^https?://hg.mozilla.org/(.+)/rev/([0-9a-z]{12})$', filedat, re.MULTILINE)
   rev = m.group(2)
   branch = m.group(1)
   nightlyfile = infofile[:-4] + ".tar.bz2"
@@ -206,7 +206,7 @@ def get_hg_range(repodir, firstcommit, lastcommit, pullfirst=False):
 # specified date range
 def list_tinderbox_builds(starttime = 0, endtime = int(time.time()), branch = gDefaultBranch):
   ftp = ftp_open()
-  ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/%s-linux64/' % (branch,))
+  ftp.voidcmd('CWD /pub/firefox/tinderbox-builds/%s-linux64/' % (branch.split('/')[-1],))
 
   def get(line):
     try:
@@ -507,7 +507,7 @@ class TinderboxBuild(BaseFTPBuild):
     self._branch = branch
 
     # FIXME hardcoded linux stuff
-    basedir = "/pub/firefox/tinderbox-builds/%s-linux64" % (branch,)
+    basedir = "/pub/firefox/tinderbox-builds/%s-linux64" % (branch.split('/')[-1],)
     ftp = ftp_open()
     ftp.voidcmd('CWD %s' % (basedir,))
     ret = _ftp_check_build_dir(ftp, timestamp)
