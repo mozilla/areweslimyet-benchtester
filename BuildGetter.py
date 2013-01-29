@@ -497,7 +497,8 @@ class NightlyBuild(BaseFTPBuild):
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(BaseFTPBuild):
   def __init__(self, timestamp):
-    self._tinderbox_timestamp = int(timestamp)
+    timestamp = int(timestamp)
+    self._tinderbox_timestamp = timestamp
     self._prepared = False
     self._revision = None
     # Use this as the timestamp if finding the build fails
