@@ -95,8 +95,8 @@ def pushlog_lookup(rev, branch = "mozilla-central"):
     return False
 
   push = pushlog[pushlog.keys()[0]]
-  _stat("For rev %s on branch %s got push by %s at %u with %u changesets" % (rev, branch, push['user'], push['date'], len(push['changesets'])))
-  return push['date']
+  _stat("For rev %s on branch %s got push by %s at %u with %u changesets" % (cset, branch, push['user'], push['date'], len(push['changesets'])))
+  return cset, push['date']
 
 ##
 ## Working with ftp.m.o
@@ -311,7 +311,7 @@ class CompileBuild(Build):
     finally:
       commitinfo = hg_ui.popbuffer().split()
     self._commit = commitinfo[0] if commitinfo else None
-    self._timestamp = pushlog_lookup(self._commit)
+    (self._revision, self._timestamp) = pushlog_lookup(self._commit)
 
   def prepare(self):
     if self._log:
@@ -445,7 +445,7 @@ class FTPBuild(BaseFTPBuild):
       return
 
     (timestamp, self._revision, branch, filename) = ret
-    self._timestamp = pushlog_lookup(self._revision, branch)
+    (self._revision, self._timestamp) = pushlog_lookup(self._revision, branch)
     self._filename = "%s/%s" % (path, filename)
 
 # a nightly build. Initialized with a date() object or a YYYY-MM-DD string
@@ -492,8 +492,7 @@ class NightlyBuild(BaseFTPBuild):
         break
 
     if ret:
-      self._revision = revision
-      self._timestamp = pushlog_lookup(self._revision)
+      (self._revision, self._timestamp) = pushlog_lookup(self._revision)
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(BaseFTPBuild):
@@ -515,7 +514,7 @@ class TinderboxBuild(BaseFTPBuild):
     (timestamp, self._revision, _, filename) = ret
 
     self._filename = "%s/%s/%s" % (basedir, timestamp, filename)
-    self._timestamp = pushlog_lookup(self._revision)
+    (self._revision, self._timestamp) = pushlog_lookup(self._revision)
 
   def get_tinderbox_timestamp(self):
     return self._tinderbox_timestamp

@@ -550,23 +550,12 @@ class BatchTest(object):
     force = batchargs.get('force') if batchargs.get('force') else globalargs.get('force')
     for build in builds:
       rev = build.get_revision()
-      fullrev = rev
-      if not fullrev or len(fullrev) < 40:
-        # We want the full revision ID for database
-        revinfo = BuildGetter.get_hg_range(globalargs.get("repo"), fullrev, fullrev)
-        if revinfo and len(revinfo):
-          fullrev = revinfo[0]
-        else:
-          fullrev = None
 
-      build = BatchBuild(build, fullrev)
+      build = BatchBuild(build, rev)
       build.force = force
-      if not fullrev:
-        if not rev:
-          # Can only happen with FTP builds we failed to lookup on ftp.m.o
-          build.note = "Build is incomplete on ftp.m.o"
-        else:
-          build.note = "Failed to lookup full revision"
+      if not rev:
+        # Can happen with FTP builds we failed to lookup on ftp.m.o
+        build.note = "Build is not found or incomplete on ftp.m.o"
       elif not build.build.get_buildtime():
         # Can happen with CompileBuilds when they lookup the commit, but can't
         # find the merge commit for some reason
