@@ -441,8 +441,7 @@ class FTPBuild(BaseFTPBuild):
       return
 
     (timestamp, self._revision, filename) = ret
-    self._timestamp = pushlog_lookup(revision)
-
+    self._timestamp = pushlog_lookup(self._revision)
     self._filename = "%s/%s" % (path, filename)
 
 # a nightly build. Initialized with a date() object or a YYYY-MM-DD string
