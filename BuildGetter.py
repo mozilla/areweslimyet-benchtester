@@ -116,6 +116,38 @@ def ftp_open():
 
   return ftp
 
+def ftp_find_try_rev(rev):
+  ftp = ftp_open()
+
+  try:
+    ftp.voidcmd('CWD /pub/mozilla.org/firefox/try-builds')
+  except:
+    _stat("Could not find try directory")
+    return None
+
+  found = []
+  def findrev(line):
+    if line.endswith(rev[0:12]):
+      found.append(line)
+
+  try:
+    ftp.retrlines('NLST', findrev)
+  except:
+    _stat("Failed to list try directory")
+    return
+
+  if not len(found):
+    _stat("Could not find a try folder matching %s" % (rev,))
+    return None
+
+  try:
+    ftp.voidcmd('CWD %s/try-linux64' % found[0])
+  except:
+    _stat("Folder %s does not contain a linux64 build")
+    return None
+
+  return "/pub/mozilla.org/firefox/try-builds/%s/try-linux64" % found[0]
+
 # Reads a file, returns the blob
 def _ftp_get(ftp, filename):
   # (We use readfile.filedat temporarily because of py2's lack of proper scoping
@@ -431,23 +463,29 @@ class FTPBuild(BaseFTPBuild):
     self._prepared = False
     self._path = path
 
-    _stat("Checking for linux-64 build at %s" % (path,))
+    if path.startswith("try:"):
+      self._path = ftp_find_try_rev(path[4:])
+      if not self._path:
+        _stat("Failed to find try revision %s" % path[4:])
+        return
+
+    _stat("Checking for linux-64 build at %s" % (self._path,))
 
     ftp = ftp_open()
     try:
-      ftp.voidcmd('CWD %s' % path)
+      ftp.voidcmd('CWD %s' % self._path)
     except:
-      _stat("Could not change to directory %s" % path)
+      _stat("Could not change to directory %s" % self._path)
       return
 
-    ret = _ftp_check_build_dir(ftp, path)
+    ret = _ftp_check_build_dir(ftp, self._path)
     if not ret:
       _stat("No linux64 build found")
       return
 
     (timestamp, self._revision, branch, filename) = ret
     (self._revision, self._timestamp) = pushlog_lookup(self._revision, branch)
-    self._filename = "%s/%s" % (path, filename)
+    self._filename = "%s/%s" % (self._path, filename)
 
 # a nightly build. Initialized with a date() object or a YYYY-MM-DD string
 class NightlyBuild(BaseFTPBuild):
