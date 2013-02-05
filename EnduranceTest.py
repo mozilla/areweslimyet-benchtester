@@ -111,14 +111,14 @@ class EnduranceTest(BenchTester.BenchTest):
       successful = len(mozmillinst.fails) == 0
     except Exception, e:
       try:
-        mozmillinst.stop()
+        mozmillinst.stop(fatal=True)
         shutil.rmtree(profdir)
       except: pass
       return self.error("Endurance test run failed -- %s: %s" % (type(e), e))
 
     self.info("Endurance - cleaning up")
     try:
-      mozmillinst.stop()
+      mozmillinst.stop(fatal=True)
       shutil.rmtree(profdir)
     except Exception, e:
       self.error("Failed to properly cleanup mozmill -- %s: %s" % (type(e), e))
