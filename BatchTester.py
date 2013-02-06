@@ -555,13 +555,10 @@ class BatchTest(object):
       build = BatchBuild(build, rev)
       build.force = force
       build.series = batchargs.get('series')
-      if not rev:
-        # Can happen with FTP builds we failed to lookup on ftp.m.o
-        build.note = "Build is not found or incomplete on ftp.m.o"
-      elif not build.build.get_buildtime():
-        # Can happen with CompileBuilds when they lookup the commit, but can't
-        # find the merge commit for some reason
-        build.note = "Failed to lookup build's effective merge timestamp"
+      if not build.get_valid():
+        # Can happen with FTP builds we failed to lookup on ftp.m.o, or any
+        # builds that arn't found in pushlog
+        build.note = "Build is not found or missing from pushlog"
       elif hook and not hook.should_test(build, globalargs):
         if not build.note:
           build.note = "Build skipped by tester";
