@@ -320,7 +320,7 @@ class BaseFTPBuild(Build):
 class CompileBuild(Build):
   def __init__(self, repo, mozconfig, objdir, pull=False, commit=None, log=None):
     self._repopath = repo
-    self._commit = None
+    self._commit = commit
     self._mozconfig = mozconfig
     self._pull = pull
     self._objdir = objdir
@@ -330,23 +330,10 @@ class CompileBuild(Build):
     ##
     ## Get info about commit
     ##
-    import mercurial, mercurial.ui, mercurial.hg, mercurial.commands
-    hg_ui = mercurial.ui.ui()
-    repo = mercurial.hg.repository(hg_ui, self._repopath)
 
-    _stat("Getting commit info")
-    commitname = commit if commit else "."
-    hg_ui.pushbuffer()
-    try:
-      mercurial.commands.log(hg_ui, repo, rev=[commitname], template="{node} {date}", date="", user=None, follow=None)
-    except Exception, e:
-      _stat("Mercurial failed to lookup revision %s <%s: %s>" % (commitname, type(e), e))
-    finally:
-      commitinfo = hg_ui.popbuffer().split()
-    self._commit = commitinfo[0] if commitinfo else None
-    ret = pushlog_lookup(self._commit)
+    ret = pushlog_lookup(commit)
     if not ret:
-      _stat("ERR: Pushlog lookup failed for %s" % (self._commit))
+      _stat("ERR: Pushlog lookup failed for %s" % (commit))
       return
 
     (self._revision, self._timestamp) = ret
@@ -394,7 +381,7 @@ class CompileBuild(Build):
     if self._checkout:
       _stat("Performing checkout")
       hg_ui.pushbuffer()
-      mercurial.commands.update(hg_ui, repo, node=self._commit, check=True)
+      mercurial.commands.update(hg_ui, repo, node=self._revision, check=True)
       result = hg_ui.popbuffer()
       if self._logfile:
         self._logfile.write(result)
@@ -459,7 +446,7 @@ class CompileBuild(Build):
     return os.path.join(self._extracted, "firefox", "firefox")
 
   def get_revision(self):
-    return self._commit
+    return self._revision
 
 # A build that simply points to a FTP directory on ftp.m.o
 # TODO currently we just hard-code 64bit-linux builds...
