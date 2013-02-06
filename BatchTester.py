@@ -555,7 +555,7 @@ class BatchTest(object):
       build = BatchBuild(build, rev)
       build.force = force
       build.series = batchargs.get('series')
-      if not build.get_valid():
+      if not build.build.get_valid():
         # Can happen with FTP builds we failed to lookup on ftp.m.o, or any
         # builds that arn't found in pushlog
         build.note = "Build is not found or missing from pushlog"
