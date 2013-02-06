@@ -344,7 +344,12 @@ class CompileBuild(Build):
     finally:
       commitinfo = hg_ui.popbuffer().split()
     self._commit = commitinfo[0] if commitinfo else None
-    (self._revision, self._timestamp) = pushlog_lookup(self._commit)
+    ret = pushlog_lookup(self._commit)
+    if not ret:
+      _stat("ERR: Pushlog lookup failed for %s" % (self._commit))
+      return
+
+    (self._revision, self._timestamp) = ret
 
   def prepare(self):
     if self._log:
@@ -484,7 +489,11 @@ class FTPBuild(BaseFTPBuild):
       return
 
     (timestamp, self._revision, branch, filename) = ret
-    (self._revision, self._timestamp) = pushlog_lookup(self._revision, branch)
+    ret = pushlog_lookup(self._revision, branch)
+    if not ret:
+      _stat("ERR: Pushlog lookup failed for %s on %s" % (self._revision, branch))
+      return
+    (self._revision, self._timestamp) = ret
     self._filename = "%s/%s" % (self._path, filename)
 
 # a nightly build. Initialized with a date() object or a YYYY-MM-DD string
@@ -530,8 +539,16 @@ class NightlyBuild(BaseFTPBuild):
         self._filename = "%s/%s/%s" % (nightlydir, x, filename)
         break
 
-    if ret:
-      (self._revision, self._timestamp) = pushlog_lookup(self._revision)
+    if not ret:
+      _stat("ERR: Failed to find directory containing this nightly")
+      return
+
+    ret = pushlog_lookup(self._revision)
+    if not ret:
+      _stat("ERR: Failed to lookup this nightly in the pushlog")
+      return
+
+    (self._revision, self._timestamp) = ret
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(BaseFTPBuild):
@@ -543,6 +560,7 @@ class TinderboxBuild(BaseFTPBuild):
     # Use this as the timestamp if finding the build fails
     self._timestamp = self._tinderbox_timestamp
     self._branch = branch
+    self._ready = False
 
     # FIXME hardcoded linux stuff
     basedir = "/pub/firefox/tinderbox-builds/%s-linux64" % (branch.split('/')[-1],)
@@ -555,7 +573,18 @@ class TinderboxBuild(BaseFTPBuild):
     (timestamp, self._revision, _, filename) = ret
 
     self._filename = "%s/%s/%s" % (basedir, timestamp, filename)
-    (self._revision, self._timestamp) = pushlog_lookup(self._revision)
+    ret = pushlog_lookup(self._revision)
+    if not ret:
+      _stat("Failed to lookup this tinderbox build in the pushlog")
+      return
+    (self._revision, self._timestamp) = ret
+    self._ready = True
+
+  def prepare(self):
+    if not self._ready:
+      _stat("Cannot prepare a build that failed lookup")
+      return False
+    return super(TinderboxBuild, self).prepare()
 
   def get_tinderbox_timestamp(self):
     return self._tinderbox_timestamp
