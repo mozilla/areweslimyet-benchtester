@@ -268,6 +268,8 @@ class Build():
     raise Exception("Attempt to call method on abstract base class")
   def get_buildtime(self):
     raise Exception("Attempt to call method on abstract base class")
+  def get_valid(self):
+    raise Exception("Attempt to call method on abstract base class")
   # Requires prepare()'d
   def get_binary(self):
     raise Exception("Attempt to call method on abstract base class")
@@ -275,9 +277,10 @@ class Build():
 # Abstract class with shared helpers for TinderboxBuild/NightlyBuild
 class BaseFTPBuild(Build):
   def prepare(self):
+    if not self._valid:
+      raise Exception("Attempted to prepare() invalid build")
     if not self._revision or not self._timestamp:
-      _stat("Cannot setup build that failed lookup")
-      return False
+      raise Exception("Valid build lacks revision/timestamp?")
 
     ftp = ftp_open()
 
@@ -310,6 +313,9 @@ class BaseFTPBuild(Build):
   def get_buildtime(self):
     return self._timestamp
 
+  def get_valid(self):
+    return self._valid
+
 # A build that needs to be compiled
 # repo - The local repo to use to build (must be cloned first)
 # commit - If set, checkout this commit
@@ -327,6 +333,8 @@ class CompileBuild(Build):
     self._log = log
     self._logfile = None
     self._checkout = True if commit else False
+    self._valid = False
+
     ##
     ## Get info about commit
     ##
@@ -337,6 +345,7 @@ class CompileBuild(Build):
       return
 
     (self._revision, self._timestamp) = ret
+    self._valid = True
 
   def prepare(self):
     if self._log:
@@ -352,8 +361,10 @@ class CompileBuild(Build):
     ##
     ## Lookup timestamp, sanity checks
     ##
-    if not self._timestamp or not self._commit:
-      raise Exception("Cannot continue with incompletely looked-up build")
+    if not self._valid:
+      raise Exception("Cannot prepare an invalid build")
+    if not self._timestamp or not self._revision:
+      raise Exception("Valid build without a timestamp and revision?")
     if not os.path.exists(self._mozconfig):
       raise Exception("Mozconfig given to CompileBuild does not exist")
     if not os.path.exists(self._repopath) or not os.path.exists(os.path.join(self._repopath, ".hg")):
@@ -448,6 +459,9 @@ class CompileBuild(Build):
   def get_revision(self):
     return self._revision
 
+  def get_valid(self):
+    return self._valid
+
 # A build that simply points to a FTP directory on ftp.m.o
 # TODO currently we just hard-code 64bit-linux builds...
 class FTPBuild(BaseFTPBuild):
@@ -490,6 +504,7 @@ class NightlyBuild(BaseFTPBuild):
     self._date = date
     self._timestamp = None
     self._revision = None
+    self._valid = False
     month = self._date.month
     day = self._date.day
     year = self._date.year
@@ -536,6 +551,7 @@ class NightlyBuild(BaseFTPBuild):
       return
 
     (self._revision, self._timestamp) = ret
+    self._valid = True
 
 # A tinderbox build from ftp.m.o. Initialized with a timestamp to build
 class TinderboxBuild(BaseFTPBuild):
@@ -547,7 +563,7 @@ class TinderboxBuild(BaseFTPBuild):
     # Use this as the timestamp if finding the build fails
     self._timestamp = self._tinderbox_timestamp
     self._branch = branch
-    self._ready = False
+    self._valid = False
 
     # FIXME hardcoded linux stuff
     basedir = "/pub/firefox/tinderbox-builds/%s-linux64" % (branch.split('/')[-1],)
@@ -565,13 +581,7 @@ class TinderboxBuild(BaseFTPBuild):
       _stat("Failed to lookup this tinderbox build in the pushlog")
       return
     (self._revision, self._timestamp) = ret
-    self._ready = True
-
-  def prepare(self):
-    if not self._ready:
-      _stat("Cannot prepare a build that failed lookup")
-      return False
-    return super(TinderboxBuild, self).prepare()
+    self._valid = True
 
   def get_tinderbox_timestamp(self):
     return self._tinderbox_timestamp
