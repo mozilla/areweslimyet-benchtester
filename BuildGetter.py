@@ -468,6 +468,7 @@ class FTPBuild(BaseFTPBuild):
   def __init__(self, path):
     self._prepared = False
     self._path = path
+    self._valid = False
 
     if path.startswith("try:"):
       self._path = ftp_find_try_rev(path[4:])
@@ -496,6 +497,7 @@ class FTPBuild(BaseFTPBuild):
       return
     (self._revision, self._timestamp) = ret
     self._filename = "%s/%s" % (self._path, filename)
+    self._valid = True
 
 # a nightly build. Initialized with a date() object or a YYYY-MM-DD string
 class NightlyBuild(BaseFTPBuild):
