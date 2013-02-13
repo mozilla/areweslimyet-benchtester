@@ -60,41 +60,41 @@ class BenchTest():
   def __init__(self, parent):
     self.tester = parent
     self.name = "Unconfigured Test Module"
-    
+
   def run_test(self, testname, testvars={}):
     return self.error("run_test() not defined")
-    
+
   def setup(self):
     return True
-    
+
   def error(self, msg):
     return self.tester.error("[%s] %s" % (self.name, msg))
-  
+
   def warn(self, msg):
     return self.tester.warn("[%s] %s" % (self.name, msg))
-  
+
   def info(self, msg):
     return self.tester.info("[%s] %s" % (self.name, msg))
 
 # The main class for running tests
 class BenchTester():
-    
+
   def info(self, msg):
     self.log('info', msg)
-    
+
   def error(self, msg):
     self.errors.append(msg)
     self.log('error', msg)
     return False
-    
+
   def warn(self, msg):
     self.warnings.append(msg)
     self.log('warning', msg)
-    
+
   def log(self, type, msg, timestamp = None, noprint = False):
     if not timestamp:
       timestamp = time.clock() - self.starttime
-      
+
     if self.logfile:
       self.logfile.write("%.2f :: %s :: %s\n" % (timestamp, type.upper(), msg))
       self.logfile.flush()
@@ -102,10 +102,10 @@ class BenchTester():
       # Cache lines until setup is called to open the logfile
       if not hasattr(self, 'logcache'): self.logcache = []
       self.logcache.append((type, msg, timestamp))
-    
+
     if not noprint:
       self.out.write("[%.2f] %s: %s\n" % (timestamp, type.upper(), msg))
-    
+
   def run_test(self, testname, testtype, testvars={}):
     if not self.ready:
       return self.error("run_test() called before setup")
@@ -113,27 +113,27 @@ class BenchTester():
     # make sure a record is created, even if no testdata is produced
     if not self._open_db():
       return self.error("Failed to open sqlite database")
-    
+
     if self.modules.has_key(testtype):
       self.info("Passing test '%s' to module '%s'" % (testname, testtype))
       return self.modules[testtype].run_test(testname, testvars)
     else:
       return self.error("Test '%s' is of unknown type '%s'" % (testname, testtype))
-  
+
   # Modules are named 'SomeModule.py' and have a class named 'SomeModule' based on BenchTest
   def load_module(self, modname):
     if self.ready:
       return self.error("Modules must be loaded before setup()")
-      
+
     if self.modules.has_key(modname): return True
-    
+
     self.info("Loading module '%s'" % (modname))
     try:
       module = __import__(modname)
       self.modules[modname] = vars(module)[modname](self)
     except Exception, e:
       return self.error("Failed to load module '%s', Exception '%s': %s" % (modname, type(e), e))
-        
+
     return True
 
   def add_test_results(self, testname, datapoints, succeeded=True):
@@ -192,7 +192,7 @@ class BenchTester():
     self.sqlite = False
     self.errors = []
     self.warnings = []
-    
+
     # These can be passed to setup() like so:
     #   mytester.setup({'binary': 'blah', 'buildname': 'blee'})
     # OR you can call mytester.parseArgs() on a command-line formatted arg list (sys.argv) to extract
@@ -208,14 +208,14 @@ class BenchTester():
                                                      action='append')
     self.add_argument('-l', '--logfile',             help='Log to given file')
     self.add_argument('-s', '--sqlitedb',            help='Merge datapoint into specified sqlite database')
-    
+
     self.info("BenchTester instantiated")
-    
+
   def add_argument(self, *args, **kwargs):
     act = self.argparser.add_argument(*args, **kwargs)
     if kwargs.has_key('default'):
       self.args[act.dest] = kwargs['default']
-  
+
   # Parses commandline arguments, *AND* loads the modules specified on them,
   #   such that their arguments can be known/parsed. Does not prevent loading of
   #   more modules later on.
@@ -237,15 +237,15 @@ class BenchTester():
       return args
     except SystemExit, e:
         return False
-  
+
   def __del__(self):
     # In case we exception out mid transaction or something
     if (hasattr(self, 'sqlite') and self.sqlite):
       self.sqlite.rollback()
-    
+
   def _open_db(self):
     if not self.args['sqlitedb'] or self.sqlite: return True
-    
+
     self.info("Setting up SQLite")
     if not self.buildname or not self.buildtime:
       self.error("Cannot use db without a buildname and buildtime set")
@@ -278,16 +278,16 @@ class BenchTester():
       self.error("Failed to setup sqliteDB '%s': %s - %s\n" % (self.args['sqlitedb'], type(e), e))
       self.sqlitedb = self.args['sqlitedb'] = None
       return False
-    
+
     return True
 
   def setup(self, args):
     self.info("Performing setup")
     self.hg_ui = mercurial.ui.ui()
-    
+
     # args will already contain defaults from add_argument calls
     self.args.update(args)
-    
+
     # Open logfile
     if self.args['logfile']:
       self.logfile_path = None
@@ -304,7 +304,7 @@ class BenchTester():
           self.log(time, msg, timestamp, True)
         self.logcache = None
     self.info("Opened logfile")
-    
+
     # Check that binary is set
     if not self.args['binary']:
       return self.error("--binary is required, see --help")
@@ -314,14 +314,14 @@ class BenchTester():
       self.binary = False
     if not self.binary or not os.path.exists(self.binary):
       return self.error("Unable to access binary '%s' (abs: '%s')\n" % (self.args['binary'], self.binary if self.binary else "Cannot resolve"))
-    
+
     # Set commit name/timestamp
     if (self.args['buildname']):
       self.buildname = self.args['buildname'].strip()
     if (self.args['buildtime']):
       self.buildtime = str(self.args['buildtime']).strip()
 
-    
+
     # Try to autodetect commitname/time if given a binary in a repo
     if not self.buildname or not self.buildtime:
       try:
@@ -347,13 +347,13 @@ class BenchTester():
           self.error("Found a Hg repo, but failed to get  changeset/timestamp. \
                       You may need to provide these manually with --buildname, --buildtime\
                       \nError was: %s" % (e));
-    
+
     # Sanity checks
     if (self.sqlite):
       if (not self.buildname or not len(self.buildname)):
         self.error("Must provide a name for this build via --buildname in order to log to sqlite")
         return False
-      
+
       try:
         inttime = int(self.buildtime, 10)
       except:
@@ -361,7 +361,7 @@ class BenchTester():
       if (not inttime or str(inttime) != self.buildtime or inttime < 1):
         self.error("--buildtime must be set to a unix timestamp in order to log to sqlite")
         return False
-    
+
     self.failed_modules = {}
     for m in self.modules:
       if not self.modules[m].setup():
@@ -369,7 +369,7 @@ class BenchTester():
         self.failed_modules[m] = self.modules[m]
     for m in self.failed_modules:
       del self.modules[m]
-    
+
     self.ready = True
     self.info("Setup successful")
     return True
