@@ -34,11 +34,14 @@ gTableSchemas = [
   '''CREATE TABLE IF NOT EXISTS
       "benchtester_datapoints" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                                 "name" VARCHAR NOT NULL UNIQUE)''',
+
   # Data - datapoints from tests
   '''CREATE TABLE IF NOT EXISTS
       "benchtester_data" ("test_id" INTEGER NOT NULL,
                           "datapoint_id" INTEGER NOT NULL,
-                          "value" INTEGER NOT NULL)''',
+                          "value" INTEGER NOT NULL,
+                          "meta" VARCHAR)''',
+
   # Some default indexes
   '''CREATE INDEX IF NOT EXISTS test_lookup ON benchtester_tests ( name, build_id DESC )''',
   '''CREATE INDEX IF NOT EXISTS data_for_test ON benchtester_data ( test_id DESC, datapoint_id )'''
@@ -136,6 +139,9 @@ class BenchTester():
 
     return True
 
+  # datapoints a list of the format [ [ "key", value, "meta"], ... ].
+  # Duplicate keys are allowed. Value is numeric and required, meta is an
+  # optional string (see db format)
   def add_test_results(self, testname, datapoints, succeeded=True):
     # Ensure DB is open
     if not self._open_db():
@@ -161,15 +167,19 @@ class BenchTester():
         self.info("Inserting %u datapoints into DB" % len(datapoints))
         cur.executemany("INSERT OR IGNORE INTO `benchtester_datapoints`(name) "
                         "VALUES (?)",
-                        ([datapoint] for datapoint, val in datapoints.iteritems()))
+                        ([ datapoint[0] ] for datapoint in datapoints))
         self.sqlite.commit()
         self.info("Filled datapoint names in %.02fs" % (time.time() - insertbegin))
         insertbegin = time.time()
+        # If val is a list, it is interpreted as [ value, meta ]
         cur.executemany("INSERT INTO `benchtester_data` "
-                        "SELECT ?, p.id, ? FROM `benchtester_datapoints` p "
+                        "SELECT ?, p.id, ?, ? FROM `benchtester_datapoints` p "
                         "WHERE p.name = ?",
-                        ( [testid, val, datapoint]
-                          for datapoint, val in datapoints.iteritems()))
+                        ( [ testid,
+                            dp[1],
+                            dp[2] if len(dp) > 2 else None,
+                            dp[0] ]
+                          for dp in datapoints ))
         self.sqlite.commit()
         self.info("Filled datapoint values in %.02fs" % (time.time() - insertbegin))
       except Exception, e:
