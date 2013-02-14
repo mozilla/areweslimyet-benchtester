@@ -132,7 +132,7 @@ class EnduranceTest(BenchTester.BenchTest):
     if not self.endurance_results:
       return self.error("Test did not return any endurance data!")
 
-    results = {}
+    results = list()
     for x in range(len(self.endurance_results['iterations'])):
       iteration = self.endurance_results['iterations'][x]
       for checkpoint in iteration['checkpoints']:
@@ -151,7 +151,7 @@ class EnduranceTest(BenchTester.BenchTest):
             memval = memval['val']
           else:
             prefix = ""
-          results["/".join(["%sIteration %u" % (prefix, iternum), label, memtype])] = memval
+          results.append([ "%s%s" % (prefix, memtype), memval, "%s:%u" % (label, iternum) ])
 
     if not self.tester.add_test_results(testname, results, successful):
       return self.error("Failed to save test results")
