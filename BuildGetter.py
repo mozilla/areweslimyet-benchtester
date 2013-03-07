@@ -539,7 +539,7 @@ class NightlyBuild(BaseFTPBuild):
     for x in nightlydirs:
       ret = _ftp_check_build_dir(ftp, x)
       if ret:
-        (timestamp, revision, _, filename) = ret
+        (self._timestamp, self._revision, _, filename) = ret
         self._filename = "%s/%s/%s" % (nightlydir, x, filename)
         break
 
