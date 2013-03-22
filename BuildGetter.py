@@ -469,6 +469,7 @@ class FTPBuild(BaseFTPBuild):
     self._prepared = False
     self._path = path
     self._valid = False
+    self._timestamp = None
 
     if path.startswith("try:"):
       self._path = ftp_find_try_rev(path[4:])
