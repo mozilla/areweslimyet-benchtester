@@ -112,8 +112,8 @@ class EnduranceTest(BenchTester.BenchTest):
     except Exception, e:
       try:
         mozmillinst.stop(fatal=True)
-        shutil.rmtree(profdir)
       except: pass
+      shutil.rmtree(profdir)
       return self.error("Endurance test run failed -- %s: %s" % (type(e), e))
 
     self.info("Endurance - cleaning up")
@@ -123,9 +123,10 @@ class EnduranceTest(BenchTester.BenchTest):
       # hard=True can cause errors in cleanup(). However, since we nuke the
       # profile ourselves, cleanup is unnecessary.
       mozmillinst.stop_runner(timeout=10, close_bridge=True, hard=True)
-      shutil.rmtree(profdir)
     except Exception, e:
       self.error("Failed to properly cleanup mozmill -- %s: %s" % (type(e), e))
+    finally:
+      shutil.rmtree(profdir)
 
     self.info("Endurance - saving results")
 
