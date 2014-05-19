@@ -578,7 +578,7 @@ class TinderboxBuild(BaseFTPBuild):
       return
     (timestamp, self._revision, _, filename) = ret
 
-    self._filename = "%s/%s/%s" % (basedir, timestamp, filename)
+    self._filename = "%s/%s/%s" % (basedir, self._tinderbox_timestamp, filename)
     ret = pushlog_lookup(self._revision)
     if not ret:
       _stat("Failed to lookup this tinderbox build in the pushlog")
